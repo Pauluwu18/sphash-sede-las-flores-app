@@ -85,7 +85,12 @@ label:not(.late-toggle), .field-label { display: block; margin: 24px 0 9px; font
 .type-option span { display: block; padding: 12px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); background: #fbfcfd; text-align: center; font-size: .86rem; font-weight: 600; }
 .type-option input:checked + span { border-color: var(--teal); color: var(--teal-dark); background: var(--soft-teal); }
 .type-option input:focus-visible + span { box-shadow: 0 0 0 3px rgba(0,124,131,.12); }
-.input-row { display: flex; align-items: center; gap: 9px; }
+.input-row { position: relative; display: flex; align-items: center; gap: 9px; }
+.person-name-suggestions { position: absolute; top: calc(100% + 5px); right: 0; left: 0; z-index: 8; display: grid; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: 0 12px 28px rgba(16,42,67,.18); }
+.person-name-suggestions[hidden] { display: none; }
+.person-name-suggestions button { min-height: 42px; padding: 0 14px; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); background: #fff; font-family: "DM Sans", sans-serif; font-size: .9rem; text-align: left; }
+.person-name-suggestions button:last-child { border-bottom: 0; }
+.person-name-suggestions button:hover, .person-name-suggestions button:focus { color: var(--teal-dark); background: var(--soft-teal); outline: none; }
 select, input[type="text"] { width: 100%; min-width: 0; height: 46px; border: 1px solid var(--line); border-radius: 5px; padding: 0 13px; color: var(--ink); background: #fbfcfd; outline: none; }
 select:focus, input[type="text"]:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,124,131,.12); }
 .or { color: var(--muted); font-size: .8rem; }

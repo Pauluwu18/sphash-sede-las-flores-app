@@ -103,8 +103,8 @@
             </label>
           </div>
           <div class="input-row">
-            <input id="person-name" type="text" maxlength="40" placeholder="Escribir nombre" aria-label="Escribir nombre" list="person-name-suggestions">
-            <datalist id="person-name-suggestions"></datalist>
+            <input id="person-name" type="text" maxlength="40" placeholder="Buscar o escribir nombre" aria-label="Buscar o escribir nombre" autocomplete="off" aria-autocomplete="list" aria-controls="person-name-suggestions">
+            <div class="person-name-suggestions" id="person-name-suggestions" role="listbox" hidden></div>
           </div>
           <label class="late-toggle" for="late-checkbox">
             <input id="late-checkbox" type="checkbox">

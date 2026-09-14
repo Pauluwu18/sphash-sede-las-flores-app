@@ -258,10 +258,17 @@ function resetRegisteredPeople() {
 
 function renderPersonSuggestions(query = "") {
   const search = normalizePersonName(query).toLocaleLowerCase();
+  if (!search) {
+    personNameSuggestions.hidden = true;
+    personNameSuggestions.innerHTML = "";
+    return;
+  }
   const items = [...new Set(registeredPeople.map((person) => normalizePersonName(person)).filter(Boolean))]
-    .filter((name) => !search || name.toLocaleLowerCase().includes(search))
-    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
-  personNameSuggestions.innerHTML = items.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
+    .filter((name) => name.toLocaleLowerCase().includes(search))
+    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))
+    .slice(0, 5);
+  personNameSuggestions.innerHTML = items.map((name) => `<button type="button" role="option" data-suggestion-name="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("");
+  personNameSuggestions.hidden = !items.length;
 }
 
 function renderRegisteredPeople(searchTerm = "") {
@@ -390,8 +397,18 @@ async function loadInventory() {
 input.addEventListener("input", () => {
   renderPersonSuggestions(input.value);
 });
-input.addEventListener("focus", () => { isInputFocused = true; });
-input.addEventListener("blur", () => { isInputFocused = false; });
+input.addEventListener("focus", () => { isInputFocused = true; renderPersonSuggestions(input.value); });
+input.addEventListener("blur", () => {
+  isInputFocused = false;
+  window.setTimeout(() => { personNameSuggestions.hidden = true; }, 120);
+});
+personNameSuggestions.addEventListener("click", (event) => {
+  const suggestion = event.target.closest("[data-suggestion-name]");
+  if (!suggestion) return;
+  input.value = suggestion.dataset.suggestionName;
+  personNameSuggestions.hidden = true;
+  input.focus();
+});
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -410,6 +427,7 @@ form.addEventListener("submit", (event) => {
   arrivals.push({ name: normalizedName, type: getPersonType(), late: lateCheckbox.checked, active: true, arrivalTime: getTime(), departureTime: "" });
   refreshMissingSurveyIfOpen();
   input.value = "";
+  personNameSuggestions.hidden = true;
   lateCheckbox.checked = false;
   showMessage("");
   render();
