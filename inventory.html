@@ -602,6 +602,24 @@
     const inventoryBackdrop = document.getElementById('inventoryBackdrop');
     const inventorySidebar = document.getElementById('inventorySidebar');
     const storageKey = 'splash-inventory-history';
+    const SUPABASE_URL = 'https://yyhvpbgvmnhonyqzevfr.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aHZwYmd2bW5ob255cXpldmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0MTMwNTEsImV4cCI6MjEwNDk4OTA1MX0.V4bE69TXc7FuxogGhCszhN0O-9XF4jfoXGgYrYGY-i0';
+
+    function inventoryHeaders(extra = {}) {
+      return { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, ...extra };
+    }
+
+    async function inventoryFetch(options = {}) {
+      const method = options.method || 'GET';
+      if (method === 'GET') {
+        return fetch(`${SUPABASE_URL}/rest/v1/inventory?select=name,owner,borrower,non_operative,no_solution,updated_at&order=name.asc`, { headers: inventoryHeaders() });
+      }
+      return fetch(`${SUPABASE_URL}/rest/v1/inventory?on_conflict=name`, {
+        method: 'POST',
+        headers: inventoryHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify([JSON.parse(options.body || '{}')])
+      });
+    }
 
     let inventoryItems = [
       { name: 'Turbinas', qty: 17, non_operative: '0', no_solution: '0' },
@@ -617,7 +635,7 @@
 
     async function loadInventoryFromServer() {
       try {
-        const response = await fetch('/api/inventory');
+        const response = await inventoryFetch();
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
           inventoryItems = data.map((item) => ({
@@ -715,7 +733,7 @@
 
       // Guardar al servidor
       try {
-        const response = await fetch('/api/inventory', {
+        const response = await inventoryFetch({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -757,7 +775,7 @@
       updateReportText();
 
       try {
-        const response = await fetch('/api/inventory', {
+        const response = await inventoryFetch({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -782,19 +800,13 @@
 
     async function pollInventoryChanges() {
       try {
-        const checkUrl = `/api/check-sync?since=${lastCheckTime}`;
-        const response = await fetch(checkUrl);
-        const data = await response.json();
-        
-        lastCheckTime = data.timestamp;
-
-        if (!data.has_changes) {
-          return;
-        }
+        const response = await inventoryFetch();
+        const remoteInventory = await response.json();
+        if (!response.ok || !Array.isArray(remoteInventory)) return;
 
         let hasChanges = false;
 
-        data.inventory.forEach((serverItem) => {
+        remoteInventory.forEach((serverItem) => {
           const localItem = inventoryItems.find((i) => i.name === serverItem.name);
           const serverQty = parseInt(serverItem.owner || serverItem.borrower || '0') || 0;
           const serverNoOp = serverItem.non_operative || '0';
@@ -825,7 +837,7 @@
             }, 10);
           }
           
-          statusMessage.textContent = '🔄 Cambios detectados de otros dispositivos...';
+          statusMessage.textContent = 'Cambios detectados de otros dispositivos...';
           setTimeout(() => {
             statusMessage.textContent = 'Sincronizado local';
           }, 4000);

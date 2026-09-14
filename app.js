@@ -37,6 +37,21 @@ async function attendanceFetch(path, options = {}) {
   return response;
 }
 
+async function inventoryFetch(options = {}) {
+  const method = options.method || "GET";
+  if (method === "GET") {
+    return fetch(`${SUPABASE_URL}/rest/v1/inventory?select=name,owner,borrower,non_operative,no_solution,updated_at&order=name.asc`, {
+      headers: supabaseHeaders()
+    });
+  }
+  const item = JSON.parse(options.body || "{}");
+  return fetch(`${SUPABASE_URL}/rest/v1/inventory?on_conflict=name`, {
+    method: "POST",
+    headers: supabaseHeaders({ "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify([item])
+  });
+}
+
 // Esta pagina no usa Service Worker; elimina cualquier registro/cache viejo que quede pegado en el navegador.
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -260,13 +275,13 @@ function renderRegisteredPeople(searchTerm = "") {
 }
 
 async function getInventory() {
-  const response = await fetch("/api/inventory");
+  const response = await inventoryFetch();
   if (!response.ok) throw new Error("No se pudo consultar el inventario");
   return response.json();
 }
 
 async function saveInventoryItem(item) {
-  const response = await fetch("/api/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) });
+  const response = await inventoryFetch({ method: "POST", body: JSON.stringify(item) });
   if (!response.ok) throw new Error("No se pudo guardar la herramienta");
 }
 
@@ -678,7 +693,7 @@ inventoryForm.addEventListener("submit", async (event) => {
     inventoryForm.hidden = true;
     drawerMessage.textContent = "Herramienta agregada.";
     loadInventory();
-  } catch { drawerMessage.textContent = "No se pudo guardar. Comprueba el servidor."; }
+  } catch { drawerMessage.textContent = "No se pudo guardar el inventario."; }
 });
 
 inventoryList.addEventListener("click", async (event) => {
