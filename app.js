@@ -657,7 +657,7 @@ backupButton.addEventListener("click", async () => {
 
 inventoryPageButton.addEventListener("click", () => {
   closeNavigation();
-  window.location.href = "/inventory.html";
+  window.location.href = "inventory.html";
 });
 
 movementsClose.addEventListener("click", () => movementsDialog.close());
