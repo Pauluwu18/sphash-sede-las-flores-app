@@ -1,0 +1,264 @@
+
+GUIA DE USO Y DOCUMENTACION
+SPLASH SEDE LAS FLORES - ORDEN DE LLEGADA
+======================================================================
+
+1. DESCRIPCION GENERAL
+----------------------------------------------------------------------
+Esta pagina web es una herramienta local para registrar las llegadas de
+personas en la sede, generar un reporte de texto y conservar los registros
+por fecha. Tambien incluye un modulo opcional para controlar herramientas
+prestadas y devueltas.
+
+La aplicacion funciona con:
+- Frontend: index.html, styles.css y app.js.
+- Servidor: server.py, escrito en Python.
+- Asistencias: Supabase cuando se configura .env; SQLite como respaldo local.
+- Inventario: registros.db, creada automaticamente con SQLite.
+- Puerto por defecto: 8000.
+
+2. REQUISITOS
+----------------------------------------------------------------------
+- Windows.
+- Python instalado y disponible como "py" o "python" en la terminal.
+- Un navegador moderno.
+- Para acceder desde otros dispositivos: todos deben estar en la misma
+	red WiFi y el firewall debe permitir conexiones al puerto 8000.
+
+3. INICIAR EL SERVIDOR
+----------------------------------------------------------------------
+Opcion recomendada:
+1. Abre la carpeta del proyecto.
+2. Ejecuta "iniciar-servidor.bat" con doble clic.
+3. Se abrira el navegador en:
+	 http://localhost:8000/index.html
+4. Mantiene abierta la ventana negra del servidor mientras uses la pagina.
+5. Para detenerlo, pulsa Ctrl+C en esa ventana.
+
+Opcion manual desde PowerShell, dentro de la carpeta:
+	 py server.py
+
+Si "py" no funciona, prueba:
+	 python server.py
+
+CONFIGURAR SUPABASE PARA ASISTENCIAS
+----------------------------------------------------------------------
+1. Crea un proyecto en https://supabase.com.
+2. En "SQL Editor", ejecuta por unica vez el contenido de
+	 supabase-schema.sql.
+3. Duplica .env.example con el nombre .env.
+4. En Supabase, abre "Project Settings > API" y coloca en .env:
+	- SUPABASE_URL
+	- SUPABASE_SERVICE_ROLE_KEY
+5. Reinicia iniciar-servidor.bat.
+
+La clave service_role no se envia al navegador. No compartas .env ni lo
+subas a Git. Con .env configurado, las asistencias se almacenan en la tabla
+daily_records de Supabase; el inventario continua siendo local.
+
+PUBLICAR COMO APK CON APPSGEYSER
+----------------------------------------------------------------------
+AppsGeyser carga una URL web publica, por lo que no puede ejecutar server.py
+ni usar http://localhost. Las asistencias ya se conectan directamente a
+Supabase usando una clave anon publica incluida en app.js.
+
+1. Sube index.html, app.js, styles.css y los recursos visuales a un hosting
+	HTTPS publico, por ejemplo GitHub Pages, Netlify o Cloudflare Pages.
+2. Abre esa URL en el navegador y registra una asistencia de prueba.
+3. En AppsGeyser elige crear una app desde Website e indica esa URL HTTPS.
+4. Antes de usar la APK, ejecuta supabase-schema.sql en Supabase SQL Editor.
+
+La clave anon puede estar en la aplicacion. No incluyas SUPABASE_SERVICE_ROLE_KEY
+en app.js, en AppsGeyser ni en un repositorio publico.
+
+El servidor imprime dos direcciones:
+- En esta PC: http://localhost:8000/index.html
+- Para WiFi: http://IP-DE-ESTA-PC:8000/index.html
+
+Usa la direccion "Para WiFi" en celulares u otras computadoras de la misma
+red. La direccion puede cambiar cuando cambia la red o la IP del equipo.
+
+4. ACCESO
+----------------------------------------------------------------------
+Credenciales configuradas actualmente:
+- Usuario: admin
+- Contrasena: 220501
+
+Despues de iniciar sesion aparece la pantalla principal. La sesion solo se
+mantiene mientras la pestaña permanece abierta; no hay usuarios ni sesiones
+administradas por el servidor.
+
+5. REGISTRAR UNA LLEGADA
+----------------------------------------------------------------------
+1. Selecciona el tipo de persona: "Operario" o "Capacitado".
+2. Escribe el nombre.
+3. Activa "Llego tarde" si corresponde.
+4. Pulsa "Registrar llegada".
+
+La lista evita duplicar nombres sin distinguir mayusculas y minusculas.
+Cada registro puede editarse con el icono de lapiz o eliminarse con el
+icono X. "Limpiar registros" borra la lista que aun no se ha guardado.
+
+Cada llegada incluye un interruptor de servicio. Empieza en verde, que
+significa "En servicio". Pulsa el interruptor para cambiarlo a rojo cuando
+la persona ya no este en servicio. El reporte indicara "fuera de servicio"
+y el estado se conserva al guardar y consultar el historial.
+
+Al guardar la asistencia, el detalle de esa fecha genera automaticamente la
+lista "Llegadas y salidas". Cada persona conserva su hora de llegada y queda
+con la salida pendiente. Pulsa "Registrar salida" cuando abandone la base;
+la aplicacion preguntara "Quieres registrar la hora exacta?". Al confirmar,
+se guarda la hora actual y el movimiento cambia a "Completado". Si se
+elige "No, registrar OK", se guarda "OK" en lugar de la hora y el movimiento
+cambia a "Completado" y la persona pasa automáticamente a "Servicio
+terminado". Si se confirma por error, pulsa "Deshacer salida" para quitar el
+registro, devolver el movimiento a "Salida pendiente" y recuperar su estado.
+
+El panel "Texto final" se actualiza en vivo y agrupa las personas por tipo.
+El formato generado es similar a:
+
+	 25/08/2026
+	 *operarios*
+	 1. Ana (tarde)
+	 *Capacitados*
+	 2. Luis
+
+6. MENÚ DE NAVEGACIÓN
+----------------------------------------------------------------------
+El botón "Menú", ubicado arriba a la izquierda, abre un panel colapsable
+con las acciones principales:
+- "Llegadas y salidas de la base": abre una ventana flotante con todos los
+	movimientos guardados, sus horas y la opción de registrar cada salida.
+- "Herramientas": abre el panel lateral del inventario.
+- "Copia de seguridad": descarga un archivo JSON con las asistencias y el
+	inventario actuales para poder conservarlo o restaurarlo manualmente.
+
+El menú se puede cerrar con la X o tocando fuera del panel. En celulares
+mantiene el mismo acceso en la esquina superior izquierda y el panel ocupa
+solo el ancho necesario para facilitar su uso con una mano.
+
+7. GUARDAR, COPIAR Y COMPARTIR
+----------------------------------------------------------------------
+- "Guardar": almacena el registro del dia en Supabase si .env esta
+	configurado, o en registros.db si no. Si ya existe un registro para esa
+	fecha, lo reemplaza con la version actual.
+- "Copiar texto": copia el reporte actual al portapapeles.
+- "Compartir por WhatsApp": abre WhatsApp con el reporte preparado.
+- En celular, el boton de compartir aparece debajo de las acciones.
+
+Para consultar datos anteriores:
+1. Pulsa "Ver registros guardados".
+2. Busca por texto o selecciona una fecha del calendario.
+3. Abre una fecha para ver sus personas, tardanzas y reporte.
+4. Desde el detalle puedes editar, agregar, copiar o compartir el registro.
+
+Importante: editar un registro guardado actualiza directamente esa fecha en
+la base de datos. Los datos no se guardan al registrar una llegada; primero
+hay que pulsar "Guardar".
+
+8. INVENTARIO DE HERRAMIENTAS
+----------------------------------------------------------------------
+Desde el menú de navegación, pulsa "Herramientas" para abrir el panel
+lateral opcional del inventario. La opción "Llegadas y salidas de la base"
+es independiente y abre su propia ventana flotante.
+
+El "Control de servicios" muestra por defecto solo los registros de hoy.
+Solo la fecha actual permite registrar o deshacer salidas. Para consultar
+un día anterior, escribe su nombre o fecha en el buscador; esos registros
+se muestran como "Solo lectura" y no pueden modificarse.
+
+Para agregar una herramienta:
+1. Pulsa "Agregar herramienta".
+2. Escribe su nombre o numero.
+3. Agrega el propietario si aplica.
+4. Pulsa "Guardar herramienta".
+
+Para registrar una salida, escribe quien lleva la herramienta y pulsa
+"Registrar salida". Para cerrar el prestamo, pulsa "Marcar como devuelta".
+El inventario se identifica por nombre: guardar otra vez el mismo nombre
+actualiza el propietario y el estado de quien la lleva. Actualmente no hay
+boton para eliminar herramientas.
+
+9. COMO FUNCIONA EL SERVIDOR
+----------------------------------------------------------------------
+server.py inicia un ThreadingHTTPServer escuchando en 0.0.0.0:8000 y sirve
+los archivos de esta misma carpeta. Cuando existe .env valido, usa la API
+REST de Supabase para daily_records. Al arrancar crea, si no existen, estas
+tablas SQLite de respaldo/inventario:
+
+- daily_records:
+	record_date, arrivals, report y updated_at.
+- inventory:
+	name, owner, borrower y updated_at.
+
+Endpoints principales:
+- GET /api/records          Lista todos los registros.
+- GET /api/records?date=... Devuelve un registro concreto.
+- POST /api/records         Crea o actualiza un registro.
+- GET /api/inventory        Lista las herramientas.
+- POST /api/inventory       Crea o actualiza una herramienta.
+
+Las peticiones POST reciben JSON. El navegador llama a estos endpoints con
+rutas relativas, por lo que la pagina debe abrirse desde este servidor y no
+como un archivo file:/// independiente.
+
+10. ARCHIVOS DEL PROYECTO
+----------------------------------------------------------------------
+- index.html: estructura, formularios, dialogos y textos de la interfaz.
+- styles.css: colores, distribucion, estados visuales y responsive movil.
+- app.js: login del cliente, validaciones, renderizado, API, historial,
+	portapapeles y WhatsApp.
+- server.py: servidor HTTP, API y persistencia SQLite.
+- iniciar-servidor.bat: acceso rapido para iniciar servidor y navegador.
+- registros.db: inventario y respaldo local creados automaticamente.
+- .env.example: plantilla de conexion a Supabase.
+- supabase-schema.sql: estructura de la tabla de asistencias en Supabase.
+- guide.txt: esta guia.
+
+11. COPIAS DE SEGURIDAD Y MANTENIMIENTO
+----------------------------------------------------------------------
+Para crear una copia desde la pagina, abre el menu y pulsa "Copia de
+seguridad". Se descargara un archivo JSON que incluye todos los registros de
+asistencia, horas, estados, salidas e inventario. No incluye credenciales.
+
+Como respaldo adicional, tambien puedes copiar el archivo "registros.db"
+con el servidor detenido. Para restaurar todos los datos localmente,
+reemplaza ese archivo por una copia valida.
+No borres registros.db mientras el servidor esta escribiendo en el.
+
+El servidor muestra en la consola las solicitudes recibidas. Si la pagina
+indica que el servidor no esta disponible, comprueba que la ventana de
+Python siga abierta y que la URL use el puerto 8000.
+
+12. SEGURIDAD Y LIMITACIONES
+----------------------------------------------------------------------
+- El usuario y la contrasena estan visibles en app.js; no es autenticacion
+	segura. Cambiarlos requiere editar el codigo y reiniciar/recargar.
+- El servidor escucha en todas las interfaces de red (0.0.0.0), por lo que
+	otros equipos de la misma red pueden intentar acceder.
+- La API permite CORS desde cualquier origen y no tiene autenticacion propia.
+- No debe publicarse en Internet ni exponerse mediante reenvio de puertos.
+- Para un uso real multiusuario se recomienda implementar autenticacion en
+	el servidor, HTTPS, control de permisos, validacion mas estricta y copias
+	de seguridad automatizadas.
+
+13. SOLUCION RAPIDA DE PROBLEMAS
+----------------------------------------------------------------------
+"Python no esta instalado": instala Python y marca la opcion para agregarlo
+al PATH; despues vuelve a ejecutar iniciar-servidor.bat.
+
+"No se puede abrir la pagina": confirma que server.py este ejecutandose y
+visita http://localhost:8000/index.html.
+
+"Otro dispositivo no conecta": usa la IP mostrada por el servidor, conecta
+ambos equipos a la misma WiFi y permite Python/puerto 8000 en el firewall.
+
+"No se guarda o no aparece el historial": revisa la consola del servidor,
+comprueba permisos de escritura en la carpeta y confirma que no se haya
+movido o bloqueado el archivo registros.db.
+
+"No copia el reporte": usa el sitio desde http://localhost o desde la URL
+de red, no desde file:///; tambien revisa los permisos del portapapeles.
+
+======================================================================
+Documento generado a partir del funcionamiento actual de la aplicacion.
