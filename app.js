@@ -11,6 +11,11 @@ function formatSupabaseRecord(record) {
   return { date: record.record_date, arrivals: record.arrivals || [], report: record.report || "", updated_at: record.updated_at };
 }
 
+function notifyAttendance(message) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  new Notification("SPLASH Control Operativo", { body: message, icon: "icon.png" });
+}
+
 async function attendanceFetch(path, options = {}) {
   const method = options.method || "GET";
   if (method === "GET") {
@@ -53,6 +58,9 @@ loginForm.addEventListener("submit", (event) => {
   const password = document.querySelector("#login-password").value;
   if (username === "admin" && password === "220501") {
     loginScreen.hidden = true;
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
     welcomeMessage.classList.add("visible");
     window.setTimeout(() => welcomeMessage.classList.remove("visible"), 3000);
     document.querySelector("#person-name").focus();
@@ -391,6 +399,7 @@ form.addEventListener("submit", (event) => {
   showMessage("");
   render();
   showToast(`${normalizedName} registrado correctamente.`);
+  notifyAttendance(`Se registró la asistencia de ${normalizedName}.`);
 });
 
 arrivalList.addEventListener("click", (event) => {
@@ -931,7 +940,18 @@ allMovementsList.addEventListener("click", async (event) => {
     if (!saveResponse.ok) throw new Error("No se pudo registrar la salida");
     movementRecords = await getSavedRecords();
     renderAllMovements(movementRecords);
-    showToast(departureChoice === "undo" ? "Salida deshecha correctamente." : "Salida registrada correctamente.");
+    const personName = savedArrivals[index].name;
+    if (departureChoice === "undo") {
+      showToast("Salida deshecha correctamente.");
+      notifyAttendance(`Se anuló la salida de ${personName}.`);
+    } else {
+      const departureTime = savedArrivals[index].departureTime;
+      const message = departureTime === "OK"
+        ? `Se registró la salida de ${personName}.`
+        : `Se registró la salida de ${personName} a las ${departureTime}.`;
+      showToast(message);
+      notifyAttendance(message);
+    }
   } catch {
     showToast("No se pudo registrar la salida.");
   }
