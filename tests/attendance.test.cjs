@@ -117,4 +117,10 @@ test('Migración y flujos de asistencia sobre PostgreSQL aislado', async t => {
     assert.ok((await api('admin_login',{username:'admin',password:initial})).token);
     assert.equal((await db.query('select * from splash_initial_access')).rows.length,0);
   });
+  await t.test('la clave solicitada de admin funciona y revoca sesiones anteriores', async () => {
+    await db.exec(fs.readFileSync('migrations/20260915_admin_password.sql','utf8').replaceAll('REEMPLAZAR_CLAVE_EN_SUPABASE','test-admin-9876'));
+    assert.ok((await api('admin_login',{username:'admin',password:'test-admin-9876'})).token);
+    assert.equal((await api('people',{},admin.token)).code,'SESSION');
+    assert.ok((await api('admin_login',{username:'admin',password:initial})).error);
+  });
 });

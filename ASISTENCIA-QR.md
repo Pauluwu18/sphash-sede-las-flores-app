@@ -12,6 +12,10 @@ La migración es transaccional y puede repetirse. Conserva los registros, cuenta
 
 ## Uso de operarios
 
+### Clave de administrador solicitada
+
+Después de la migración principal, ejecutar `migrations/20260915_admin_password.sql` para conservar la clave de administrador solicitada por el propietario. Esta consulta reemplaza la clave aleatoria inicial, cierra las sesiones de administración y limpia su bloqueo por intentos. No cambia los PIN de operarios ni sus asistencias. La clave queda almacenada como hash bcrypt en Supabase.
+
 - Página independiente: `operarios.html`. También hay un enlace desde el login de administradores.
 - Primera vez: escanear el QR físico, ingresar el DNI registrado y pulsar **Iniciar sesión**. Crear y confirmar un PIN de cuatro dígitos, incluidos PIN que empiezan por cero.
 - Después de ingresar: **Registrar asistencia** o **Mis asistencias**.
