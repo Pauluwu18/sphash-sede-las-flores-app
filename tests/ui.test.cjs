@@ -149,7 +149,11 @@ test('La página de escaneo abre cámara y permite reintentar si se deniega', as
   }}});
   w.localStorage.setItem('splash-worker-session','shared-session');
   w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
+  assert.equal(attempts,0);
+  $('start-camera').click();await flush();
   assert.equal(attempts,1);
+  assert.equal($('camera-help').open,true);
+  assert.equal($('scanner-viewport').dataset.state,'error');
   assert.equal($('checkin-panel').hidden,false);
   assert.equal($('worker-menu').hidden,true);
   assert.match($('checkin-message').textContent,/Permite el acceso/);
@@ -167,6 +171,47 @@ test('La entrada principal lleva al operario y conserva enlaces QR',()=>{
   assert.equal(link.getAttribute('href'),'admin.html');
   assert.equal(link.textContent,'Entrar como administrador');
   dom.window.close();
+});
+
+test('Una cámara sin respuesta permite reintentar y libera permisos tardíos', async t=>{
+  const dom=page('operarios.html',()=>({name:'Operario'}));
+  t.after(()=>dom.window.close());
+  dom.reconfigure({url:'https://example.com/operarios.html?view=scan'});
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  let resolveCamera, expire, stopped=0;
+  const realTimer=w.setTimeout.bind(w);
+  w.setTimeout=(callback,ms)=>ms===15000 ? (expire=callback,123) : realTimer(callback,ms);
+  Object.defineProperty(w.navigator,'mediaDevices',{value:{getUserMedia:()=>new Promise(resolve=>{resolveCamera=resolve;})}});
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
+  $('start-camera').click();
+  assert.equal($('scanner-viewport').dataset.state,'pending');
+  assert.equal($('start-camera').disabled,true);
+  expire();
+  assert.equal($('start-camera').disabled,false);
+  assert.match($('checkin-message').textContent,/no respondió/);
+  resolveCamera({getTracks:()=>[{stop(){stopped++;}}]});await flush();
+  assert.equal(stopped,1);
+  assert.equal($('qr-video').hidden,true);
+});
+
+test('Una foto QR válida habilita confirmar sin registrar automáticamente', async t=>{
+  const calls=[];
+  const dom=page('operarios.html',request=>{calls.push(request);return {name:'Operario'};});
+  t.after(()=>dom.window.close());
+  dom.reconfigure({url:'https://example.com/operarios.html?view=scan'});
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){},getImageData:()=>({data:new Uint8ClampedArray(16)})});
+  w.URL.createObjectURL=()=> 'blob:test-photo';w.URL.revokeObjectURL=()=>{};
+  w.Image=class {naturalWidth=2;naturalHeight=2;set src(value){queueMicrotask(()=>this.onload());}};
+  w.jsQR=()=>({data:`https://example.com/operarios.html#base=${'a'.repeat(64)}`});
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
+  Object.defineProperty($('qr-photo'),'files',{value:[new w.File(['test'],'qr.png',{type:'image/png'})]});
+  $('qr-photo').dispatchEvent(new w.Event('change'));await flush();
+  assert.equal($('confirm-checkin').hidden,false);
+  assert.equal($('scanner-viewport').dataset.state,'ready');
+  assert.equal(calls.filter(call=>call.action==='checkin').length,0);
 });
 
 test('El QR generado puede decodificarse con el lector incluido',()=>{

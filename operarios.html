@@ -6,7 +6,7 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=worker-2"><link rel="stylesheet" href="qr-attendance.css?v=worker-2">
+  <link rel="stylesheet" href="styles.css?v=scanner-4"><link rel="stylesheet" href="qr-attendance.css?v=scanner-4">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -36,14 +36,20 @@
     <section class="worker-panel" id="checkin-panel" hidden aria-labelledby="checkin-title">
       <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Escanear QR</h2>
       <ol class="scan-steps" aria-label="Pasos para registrar"><li id="scan-step-camera" aria-current="step">1. Abre la cámara</li><li id="scan-step-code">2. Apunta al QR</li><li id="scan-step-confirm">3. Confirma tu llegada</li></ol>
-      <p>Coloca el QR de la base dentro de la cámara. Al reconocerlo, podrás confirmar tu asistencia.</p>
-      <video id="qr-video" playsinline muted hidden></video>
+      <p class="scanner-intro">Acerca el teléfono al QR de la base y encuádralo. Tu asistencia se guarda al confirmar.</p>
+      <div class="scanner-viewport" id="scanner-viewport" data-state="idle">
+        <video id="qr-video" playsinline muted hidden></video>
+        <div class="scanner-placeholder" id="scanner-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 5l2-2h4l2 2h4v15H4V5z"/><circle cx="12" cy="12" r="4"/></svg><strong id="scanner-caption">Tu cámara aparecerá aquí</strong><span>Usa buena luz y mantén el teléfono quieto.</span></div>
+        <div class="scanner-frame" aria-hidden="true"></div>
+        <span class="scanner-badge" id="scanner-badge">Cámara apagada</span>
+      </div>
       <button class="primary-button" id="start-camera" type="button">Abrir cámara</button>
       <button class="secondary-action" id="stop-camera" type="button" hidden>Cerrar cámara</button>
       <button class="primary-button" id="confirm-checkin" type="button" hidden>Confirmar mi asistencia</button>
       <p id="checkin-message" class="scan-status" role="status" aria-live="polite"></p>
       <a id="checkin-history-link" class="secondary-action" href="operarios.html?view=history" hidden>Ver mi asistencia registrada</a>
-      <p class="worker-help">También puedes escanear el QR con la cámara de tu teléfono y abrir el enlace.</p>
+      <div class="scanner-alternatives"><label class="secondary-action photo-qr-button" for="qr-photo">Tomar foto del QR</label><input id="qr-photo" type="file" accept="image/*" capture="environment" class="visually-hidden"><p class="worker-help">Si no abre la cámara en vivo, toma una foto nítida del QR. La imagen se procesa en tu teléfono.</p></div>
+      <details class="camera-help" id="camera-help"><summary>¿La cámara no abre?</summary><ol><li>Permite la cámara para este sitio desde los permisos del navegador.</li><li>Si usas la app instalada, revisa también el permiso de cámara de la app en los ajustes del teléfono.</li><li>Si sigue bloqueada, abre este enlace en Chrome o Safari, o usa «Tomar foto del QR».</li></ol><button class="secondary-action" id="copy-scanner-link" type="button">Copiar enlace del escáner</button><input id="scanner-link" readonly aria-label="Enlace del escáner para copiar" hidden><p id="scanner-link-message" role="status"></p></details>
     </section>
     <section class="worker-panel" id="history-panel" hidden aria-labelledby="worker-history-title">
       <p class="section-kicker">Tu historial personal</p><h2 id="worker-history-title">Mis asistencias</h2>
@@ -53,6 +59,6 @@
       <p id="worker-history-message" role="status" aria-live="polite"></p><div id="worker-history"></div>
     </section>
   </main>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=worker-2"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=worker-2"></script>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=scanner-4"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=scanner-4"></script>
 </body>
 </html>

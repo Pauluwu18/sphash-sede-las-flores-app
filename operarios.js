@@ -6,6 +6,7 @@
   let frame = null;
   let scanGeneration = 0;
   let saving = false;
+  let cameraTimer;
   const view = new URLSearchParams(location.search).get('view');
   let historyRecords = [];
   let historyLoading = false;
@@ -19,6 +20,7 @@
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 
   function stopCamera() {
+    clearTimeout(cameraTimer);
     scanGeneration++;
     cancelAnimationFrame(frame);
     stream?.getTracks().forEach(track => track.stop());
@@ -27,6 +29,30 @@
     $('qr-video').hidden = true;
     $('stop-camera').hidden = true;
     $('start-camera').disabled = false;
+    $('start-camera').hidden = !!qrToken;
+    $('start-camera').textContent = 'Abrir cámara';
+    scannerState('idle', 'Tu cámara aparecerá aquí', 'Cámara apagada');
+  }
+
+  function scannerState(state, caption, badge) {
+    $('scanner-viewport').dataset.state = state;
+    $('scanner-placeholder').hidden = state === 'live';
+    $('scanner-caption').textContent = caption;
+    $('scanner-badge').textContent = badge;
+  }
+
+  function cameraError(error) {
+    stopCamera();
+    const messages = {
+      NotAllowedError: 'Permite el acceso a la cámara en los ajustes del sitio o de la app. Si ya lo bloqueaste, pulsar el botón otra vez no cambia ese permiso.',
+      NotFoundError: 'No se encontró una cámara. Prueba «Tomar foto del QR» o abre el enlace en el navegador de tu teléfono.',
+      NotReadableError: 'Otra aplicación está usando la cámara. Ciérrala y vuelve a intentarlo.',
+      TimeoutError: 'La cámara no respondió. Revisa si hay una solicitud de permiso pendiente o usa «Tomar foto del QR».'
+    };
+    $('checkin-message').textContent = messages[error.name] || error.message || 'No se pudo abrir la cámara. Revisa la guía inferior.';
+    $('camera-help').open = true;
+    scannerState('error', 'No pudimos abrir la cámara', 'Revisa los permisos');
+    $('start-camera').textContent = 'Volver a intentar';
   }
 
   function showCheckin() {
@@ -38,6 +64,7 @@
     $('checkin-message').classList.remove('is-success');
     $('checkin-history-link').hidden = true;
     setStep(qrToken ? 'confirm' : 'camera');
+    if (qrToken) scannerState('ready', 'QR reconocido', 'Listo para confirmar');
   }
 
   function setStep(step) {
@@ -72,7 +99,6 @@
     if (qrToken || view === 'scan') {
       showCheckin();
       document.title = 'Escanear QR · SPLASH';
-      if (!qrToken) $('start-camera').click();
     } else if (view === 'history') {
       $('history-panel').hidden = false;
       $('checkin-panel').hidden = true;
@@ -139,6 +165,14 @@
     stopCamera();
     const generation = scanGeneration;
     $('start-camera').disabled = true;
+    $('start-camera').textContent = 'Abriendo cámara…';
+    $('checkin-message').textContent = 'Permite el acceso cuando tu teléfono lo solicite.';
+    $('camera-help').open = false;
+    $('stop-camera').hidden = false;
+    scannerState('pending', 'Esperando permiso de cámara', 'Abriendo cámara');
+    cameraTimer = setTimeout(() => {
+      if (generation === scanGeneration) cameraError({ name: 'TimeoutError' });
+    }, 15000);
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('La cámara requiere HTTPS. También puedes usar la cámara de tu teléfono para abrir el QR.');
       const acquired = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
@@ -149,10 +183,15 @@
       video.hidden = false;
       $('stop-camera').hidden = false;
       await video.play();
+      if (generation !== scanGeneration) return;
+      clearTimeout(cameraTimer);
+      scannerState('live', '', 'Buscando el QR');
+      $('start-camera').hidden = true;
       $('checkin-message').textContent = 'Apunta la cámara al QR de la base.';
       setStep('code');
       function scan() {
         if (!stream || generation !== scanGeneration) return;
+        try {
         if (video.readyState >= 2 && video.videoWidth) {
           canvas.width = Math.min(video.videoWidth, 640);
           canvas.height = Math.round(video.videoHeight * canvas.width / video.videoWidth);
@@ -166,14 +205,57 @@
           }
         }
         frame = requestAnimationFrame(scan);
+        } catch (error) { cameraError(error); }
       }
       scan();
     } catch (error) {
-      stopCamera();
-      $('checkin-message').textContent = error.name === 'NotAllowedError' ? 'Permite el acceso a la cámara o abre el QR desde la cámara del teléfono.' : error.message;
+      if (generation === scanGeneration) cameraError(error);
     }
   });
   $('stop-camera').addEventListener('click', () => { stopCamera(); setStep('camera'); $('checkin-message').textContent = 'Cámara cerrada. Pulsa «Abrir cámara» para volver a escanear.'; });
+  $('qr-photo').addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    stopCamera();
+    const generation = scanGeneration;
+    let url;
+    try {
+      if (file.size > 20 * 1024 * 1024) throw new Error('La foto es demasiado grande. Toma otra de menor tamaño.');
+      $('checkin-message').textContent = 'Leyendo la foto del QR…';
+      url = URL.createObjectURL(file);
+      const photo = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('No se pudo abrir la foto. Usa una imagen JPG o PNG.'));
+        img.src = url;
+      });
+      if (generation !== scanGeneration || $('worker-home').hidden) return;
+      const ratio = Math.min(1, 1600 / Math.max(photo.naturalWidth, photo.naturalHeight));
+      canvas.width = Math.max(1, Math.round(photo.naturalWidth * ratio));
+      canvas.height = Math.max(1, Math.round(photo.naturalHeight * ratio));
+      context.drawImage(photo, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(pixels.data, canvas.width, canvas.height);
+      const candidate = code && Splash.readQR(code.data);
+      if (!candidate) throw new Error('No se reconoció el QR de esta base. Toma otra foto más cerca, enfocada y sin reflejos.');
+      qrToken = candidate;
+      showCheckin();
+    } catch (error) { if (generation === scanGeneration) $('checkin-message').textContent = error.message; }
+    finally { if (url) URL.revokeObjectURL(url); event.target.value = ''; }
+  });
+  $('copy-scanner-link').addEventListener('click', async () => {
+    const url = new URL('operarios.html?view=scan', location.href).href;
+    try {
+      await navigator.clipboard.writeText(url);
+      $('scanner-link-message').textContent = 'Enlace copiado. Pégalo en Chrome o Safari para abrir el escáner.';
+    } catch {
+      $('scanner-link').value = url;
+      $('scanner-link').hidden = false;
+      $('scanner-link').focus();
+      $('scanner-link').select();
+      $('scanner-link-message').textContent = 'Mantén pulsado el enlace para copiarlo y abrirlo en tu navegador.';
+    }
+  });
   $('confirm-checkin').addEventListener('click', async () => {
     if (saving || !qrToken) return;
     saving = true;
@@ -183,6 +265,7 @@
       $('checkin-message').textContent = result.message;
       $('checkin-message').classList.add('is-success');
       $('checkin-history-link').hidden = false;
+      scannerState('success', result.already ? 'Ya registraste tu llegada' : 'Asistencia registrada', 'Registro confirmado');
       qrToken = '';
       $('confirm-checkin').hidden = true;
       $('start-camera').hidden = true;
