@@ -25,6 +25,9 @@ test('Migración y flujos de asistencia sobre PostgreSQL aislado', async t => {
   const today = (await db.query("select to_char(now() at time zone 'America/Lima','DD/MM/YYYY') as workday")).rows[0].workday;
 
   await t.test('las tablas privadas y asistencias no son públicas', async () => {
+    const tables = (await db.query("select c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='splash_private' and c.relkind='r'")).rows;
+    assert.equal(tables.length,6);
+    assert.ok(tables.every(table => table.relrowsecurity), 'Todas las tablas privadas deben tener RLS activo');
     await db.exec('set role anon');
     await assert.rejects(db.query('select * from splash_private.people'), /permission denied/);
     await assert.rejects(db.query('select * from public.daily_records'), /permission denied/);

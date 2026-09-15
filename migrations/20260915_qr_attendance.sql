@@ -48,6 +48,15 @@ create table if not exists splash_private.pin_access_log (
   accessed_at timestamptz not null default now()
 );
 
+-- Defensa adicional: sin políticas para clientes; solo las funciones autorizadas
+-- acceden como propietario. Se mantienen también los REVOKE del esquema/tablas.
+alter table splash_private.settings enable row level security;
+alter table splash_private.people enable row level security;
+alter table splash_private.sessions enable row level security;
+alter table splash_private.login_attempts enable row level security;
+alter table splash_private.checkins enable row level security;
+alter table splash_private.pin_access_log enable row level security;
+
 -- Mantiene el contenido de asistencias y elimina su acceso anónimo directo.
 drop policy if exists "anonymous users can read attendance" on public.daily_records;
 drop policy if exists "anonymous users can add attendance" on public.daily_records;
@@ -318,6 +327,8 @@ where r.record_date ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
 on conflict do nothing;
 
 create temporary table if not exists splash_initial_access(password text);
+alter table splash_initial_access enable row level security;
+revoke all on splash_initial_access from public, anon, authenticated;
 truncate splash_initial_access;
 with password as (select encode(extensions.gen_random_bytes(12),'hex') value), inserted as (
   insert into splash_private.settings(id,admin_hash,encryption_key,qr_token)
