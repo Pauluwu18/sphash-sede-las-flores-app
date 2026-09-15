@@ -1,4 +1,7 @@
 let arrivals = [];
+let qrEnabled = false;
+let recordWriteBusy = false;
+const recordVersions = new Map();
 let lastSyncedReport = "";
 const SUPABASE_URL = "https://yyhvpbgvmnhonyqzevfr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5aHZwYmd2bW5ob255cXpldmZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0MTMwNTEsImV4cCI6MjEwNDk4OTA1MX0.V4bE69TXc7FuxogGhCszhN0O-9XF4jfoXGgYrYGY-i0";
@@ -18,6 +21,27 @@ function notifyAttendance(message) {
 
 async function attendanceFetch(path, options = {}) {
   const method = options.method || "GET";
+  if (qrEnabled) {
+    if (method !== "GET" && recordWriteBusy) return new Response('{}', {status:409});
+    if (method !== "GET") recordWriteBusy = true;
+    try {
+      if (method === "GET") {
+        const date = new URL(path, location.origin).searchParams.get("date");
+        const result = await Splash.call('records', date ? {date} : {});
+        if (date) recordVersions.set(date, result?.updated_at || null);
+        else result.forEach(record => { if (!recordVersions.has(record.record_date)) recordVersions.set(record.record_date,record.updated_at); });
+        return new Response(JSON.stringify(date ? (result ? formatSupabaseRecord(result) : null) : result.map(formatSupabaseRecord)), {status:200});
+      }
+      const record = JSON.parse(options.body || '{}');
+      const result = await Splash.call('save_record', {...record, expected: recordVersions.get(record.date) || null});
+      recordVersions.set(record.date,result.updated_at);
+      return new Response(JSON.stringify(result),{status:200});
+    } catch (error) {
+      showToast(error.message);
+      if (error.code === 'CONFLICT') { lastRecordSyncTime = 0; window.setTimeout(() => loadCurrentRecord(true),0); }
+      return new Response(JSON.stringify({error:error.message}),{status: error.code === 'CONFLICT' ? 409 : 400});
+    } finally { if (method !== "GET") recordWriteBusy = false; }
+  }
   if (method === "GET") {
     const date = new URL(path, window.location.origin).searchParams.get("date");
     const filter = date ? `&record_date=eq.${encodeURIComponent(date)}` : "&order=record_date.desc";
@@ -76,12 +100,33 @@ passwordToggle.addEventListener("click", () => {
   passwordToggle.setAttribute("aria-label", visible ? "Ocultar contraseña" : "Mostrar contraseña");
 });
 
-loginForm.addEventListener("submit", (event) => {
+loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const username = document.querySelector("#login-user").value.trim();
   const password = document.querySelector("#login-password").value;
-  if (username === "admin" && password === "220501") {
+  const submit = loginForm.querySelector('[type="submit"]');
+  submit.disabled = true;
+  let accepted = false;
+  try {
+    qrEnabled = await Splash.available();
+    if (qrEnabled) {
+      const result = await Splash.call('admin_login', {username,password});
+      sessionStorage.setItem('splash-admin-session', result.token);
+      await Splash.call('import_people', {names: registeredPeople});
+      localStorage.removeItem('splash-registered-people');
+      await AdminQR.refresh();
+      peopleResetButton.hidden = true;
+      accepted = true;
+    } else {
+      accepted = username === "admin" && password === "220501";
+    }
+  } catch (error) { loginMessage.textContent = error.message; return; }
+  finally { submit.disabled = false; }
+  if (accepted) {
     loginScreen.hidden = true;
+    loginPassword.value = "";
+    await loadCurrentRecord(true);
+    renderHistory();
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
@@ -185,7 +230,8 @@ let toastTimer;
 document.querySelector("#today").textContent = new Intl.DateTimeFormat("es-PE", {
   day: "2-digit",
   month: "2-digit",
-  year: "numeric"
+  year: "numeric",
+  timeZone: "America/Lima"
 }).format(new Date());
 
 function getName() {
@@ -216,7 +262,7 @@ function getDate() {
 }
 
 function getTime() {
-  return new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  return new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Lima" }).format(new Date());
 }
 
 function normalizePersonName(value) {
@@ -234,6 +280,7 @@ function persistRegisteredPeople() {
 }
 
 function addRegisteredPerson(name) {
+  if (qrEnabled) return false;
   const normalized = normalizePersonName(name);
   if (!normalized) return false;
   if (!registeredPeople.some((person) => person.toLocaleLowerCase() === normalized.toLocaleLowerCase())) {
@@ -248,6 +295,7 @@ function addRegisteredPerson(name) {
 }
 
 function removeRegisteredPerson(index) {
+  if (qrEnabled) return;
   if (!Number.isInteger(index) || !registeredPeople[index]) return;
   registeredPeople.splice(index, 1);
   persistRegisteredPeople();
@@ -256,6 +304,7 @@ function removeRegisteredPerson(index) {
 }
 
 function resetRegisteredPeople() {
+  if (qrEnabled) return;
   if (!registeredPeople.length) return;
   if (!window.confirm("¿Restablecer la lista completa de personas registradas?")) return;
   registeredPeople = [];
@@ -281,12 +330,13 @@ function renderPersonSuggestions(query = "") {
 }
 
 function renderRegisteredPeople(searchTerm = "") {
+  if (qrEnabled) { AdminQR.render(searchTerm); return; }
   const query = normalizePersonName(searchTerm).toLocaleLowerCase();
   const filtered = query
     ? registeredPeople.filter((person) => person.toLocaleLowerCase().includes(query))
     : registeredPeople;
   peopleList.innerHTML = filtered.length
-    ? filtered.map((person, index) => `<div class="people-item"><div class="people-item-name"><span>${escapeHtml(person)}</span></div><div class="people-item-actions"><button type="button" data-person-use="${index}">Usar</button><button type="button" class="people-delete" data-person-delete="${index}">Eliminar</button></div></div>`).join("")
+    ? filtered.map((person, index) => `<div class="people-item"><div class="people-item-name"><span>${escapeHtml(person)}</span></div><div class="people-item-actions"><button type="button" data-person-use="${registeredPeople.indexOf(person)}">Usar</button><button type="button" class="people-delete" data-person-delete="${registeredPeople.indexOf(person)}">Eliminar</button></div></div>`).join("")
     : '<p class="people-empty">No hay personas registradas todavía.</p>';
 }
 
@@ -432,16 +482,18 @@ form.addEventListener("submit", (event) => {
     return;
   }
   const normalizedName = normalizePersonName(name);
-  loadedReportText = "";
-  addRegisteredPerson(normalizedName);
+  if (!registeredPeople.some(person => person.toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
+    showMessage('Primero registra a la persona en Personas registradas.');
+    return;
+  }
   arrivals.push({ name: normalizedName, type: getPersonType(), late: lateCheckbox.checked, active: true, arrivalTime: getTime(), departureTime: "" });
   refreshMissingSurveyIfOpen();
   input.value = "";
   personNameSuggestions.hidden = true;
   lateCheckbox.checked = false;
   showMessage("");
-  render();
-  showToast(`${normalizedName} registrado correctamente.`);
+  scheduleAutoPush();
+  showToast(`${normalizedName}: guardando asistencia…`);
   notifyAttendance(`Se registró la asistencia de ${normalizedName}.`);
 });
 
@@ -450,7 +502,7 @@ arrivalList.addEventListener("click", (event) => {
   if (serviceButton) {
     const index = Number(serviceButton.dataset.serviceIndex);
     arrivals[index].active = arrivals[index].active === false;
-    render();
+    scheduleAutoPush();
     return;
   }
   const editButton = event.target.closest("button[data-edit-index]");
@@ -461,7 +513,7 @@ arrivalList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-index]");
   if (!button) return;
   arrivals.splice(Number(button.dataset.index), 1);
-  render();
+  scheduleAutoPush();
 });
 
 function closeNavigation() {
@@ -593,6 +645,7 @@ peopleClose.addEventListener("click", () => peopleDialog.close());
 peopleSearch.addEventListener("input", (event) => renderRegisteredPeople(event.target.value));
 
 personAddButton.addEventListener("click", () => {
+  if (qrEnabled) { AdminQR.add(); return; }
   const firstName = normalizePersonName(personFirstName.value);
   const lastName = normalizePersonName(personLastName.value);
   const fullName = buildFullPersonName(firstName, lastName);
@@ -762,7 +815,7 @@ editForm.addEventListener("submit", (event) => {
     return;
   }
   const previousArrival = arrivals[editingIndex];
-  const updatedArrival = { name, type: document.querySelector('input[name="edit-person-type"]:checked').value, late: editLate.checked, active: editService.checked, arrivalTime: previousArrival?.arrivalTime || getTime(), departureTime: previousArrival?.departureTime || "" };
+  const updatedArrival = { ...(editingSavedDate ? {} : previousArrival), name, type: document.querySelector('input[name="edit-person-type"]:checked').value, late: editLate.checked, active: editService.checked, arrivalTime: previousArrival?.arrivalTime || getTime(), departureTime: previousArrival?.departureTime || "" };
   if (editingSavedDate) {
     updateSavedArrival(updatedArrival);
     return;
@@ -770,7 +823,7 @@ editForm.addEventListener("submit", (event) => {
   arrivals[editingIndex] = updatedArrival;
   editDialog.close();
   isEditingArrival = false;
-  render();
+  scheduleAutoPush();
   showToast("Registro actualizado.");
 });
 
@@ -783,7 +836,7 @@ async function updateSavedArrival(updatedArrival) {
       showToast("Esa persona ya fue registrada.");
       return;
     }
-    savedArrivals[editingIndex] = { ...updatedArrival, arrivalTime: savedArrivals[editingIndex]?.arrivalTime || getTime(), departureTime: savedArrivals[editingIndex]?.departureTime || "" };
+    savedArrivals[editingIndex] = { ...savedArrivals[editingIndex], ...updatedArrival, arrivalTime: savedArrivals[editingIndex]?.arrivalTime || getTime(), departureTime: savedArrivals[editingIndex]?.departureTime || "" };
     const saveResponse = await attendanceFetch("/api/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: editingSavedDate, arrivals: savedArrivals, report: buildReportFor(savedArrivals, editingSavedDate) }) });
     if (!saveResponse.ok) throw new Error("No se pudo actualizar");
     editDialog.close();
@@ -805,6 +858,7 @@ document.querySelector("#clear-button").addEventListener("click", () => {
     arrivals = [];
     loadedReportText = "";
     render();
+    scheduleAutoPush();
   }
 });
 
@@ -1066,14 +1120,13 @@ copyButton.addEventListener("click", async () => {
 renderPersonSuggestions();
 renderRegisteredPeople();
 render();
-renderHistory();
 
 // ========== SINCRONIZACIÓN EN TIEMPO REAL ==========
 let lastRecordSyncTime = 0;
 let pushTimer = null;
 
 async function autoPushRecord() {
-  if (!arrivals.length && !loadedReportText) return;
+  if (!loginScreen.hidden) return;
   try {
     const response = await attendanceFetch("/api/records", {
       method: "POST",
@@ -1081,33 +1134,30 @@ async function autoPushRecord() {
       body: JSON.stringify({ date: getDate(), arrivals: arrivals, report: loadedReportText || buildReport() })
     });
     if (!response.ok) throw new Error("No se pudo guardar");
-    const updated = await attendanceFetch(`/api/records?date=${encodeURIComponent(getDate())}`).then((r) => r.json()).catch(() => null);
-    if (updated?.updated_at) lastRecordSyncTime = new Date(updated.updated_at).getTime();
+    lastRecordSyncTime = 0;
+    await loadCurrentRecord(true);
   } catch {
-    // Silencioso: se reintentará en el siguiente cambio o polling
+    showToast("No se pudo sincronizar. Actualiza el registro y repite el cambio.");
   }
 }
 
 function scheduleAutoPush() {
+  const missing = Object.entries(parseMissingReasons(loadedReportText)).filter(([name]) =>
+    !arrivals.some(arrival => arrival.name.toLocaleLowerCase() === name.toLocaleLowerCase()));
+  loadedReportText = appendMissingReport(buildReport(), missing);
+  render();
   window.clearTimeout(pushTimer);
-  pushTimer = window.setTimeout(autoPushRecord, 1500);
+  pushTimer = window.setTimeout(() => { pushTimer = null; autoPushRecord(); }, 1500);
 }
 
-// Enganchar auto-push a todos los cambios que modifican arrivals
-const triggerPushAfterChange = () => scheduleAutoPush();
-form.addEventListener("submit", triggerPushAfterChange, true);
-arrivalList.addEventListener("click", triggerPushAfterChange, true);
-
-// También auto-push cuando se cierra el diálogo de editar persona (después de cambios)
-editDialog.addEventListener("close", () => { if (editingIndex >= 0) triggerPushAfterChange(); });
-
 async function loadCurrentRecord(force = false) {
+  if (!loginScreen.hidden || recordWriteBusy || pushTimer) return;
   if (!force && (isEditingArrival || isInputFocused || editDialog.open || missingDialog.open)) return;
   try {
     const response = await attendanceFetch(`/api/records?date=${encodeURIComponent(getDate())}`);
     if (!response.ok) throw new Error("No se pudo cargar");
     const record = await response.json();
-    if (!record) return;
+    if (!record) { if (force) { arrivals = []; loadedReportText = ""; render(); } return; }
 
     const serverArrivals = record.arrivals || [];
     const serverReport = record.report || "";
@@ -1132,5 +1182,4 @@ refreshCurrentButton.addEventListener("click", () => {
 });
 
 // Cargar al iniciar y luego cada 3 segundos
-loadCurrentRecord(true);
 setInterval(() => loadCurrentRecord(false), 3000);

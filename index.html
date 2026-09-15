@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=login-fix-20260915">
+  <link rel="stylesheet" href="styles.css?v=qr-1">
+  <link rel="stylesheet" href="qr-attendance.css?v=qr-1">
 </head>
 <body>
   <div class="login-screen" id="login-screen">
@@ -34,6 +35,7 @@
       </div>
       <button class="login-button" type="submit">Iniciar sesión</button>
       <p class="login-message" id="login-message" role="alert" aria-live="polite"></p>
+      <a class="portal-link" href="operarios.html">Soy operario ? Acceder con DNI</a>
     </form>
   </div>
   <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="navigation-drawer" aria-label="Abrir menú de navegación">
@@ -50,6 +52,8 @@
       <button class="dialog-close" id="navigation-close" type="button" aria-label="Cerrar menú">&times;</button>
     </div>
     <nav class="navigation-actions" aria-label="Acciones principales">
+      <button class="navigation-action" id="generate-qr-button" type="button"><span><strong>QR de asistencia</strong><small>Generar, imprimir o descargar el QR de la base</small></span></button>
+      <button class="navigation-action" id="admin-logout" type="button"><span><strong>Cerrar sesi?n</strong></span></button>
       <button class="navigation-action" id="register-base-arrival" type="button">
         <span class="navigation-action-icon" aria-hidden="true">+</span>
         <span><strong>Registrar llegada a la base</strong><small>Añadir quién ya llegó hoy</small></span>
@@ -113,7 +117,7 @@
             </label>
           </div>
           <div class="input-row">
-            <input id="person-name" type="text" maxlength="40" placeholder="Buscar o escribir nombre" aria-label="Buscar o escribir nombre" autocomplete="off" aria-autocomplete="list" aria-controls="person-name-suggestions">
+            <input id="person-name" type="text" maxlength="40" placeholder="Buscar persona registrada" aria-label="Buscar o escribir nombre" autocomplete="off" aria-autocomplete="list" aria-controls="person-name-suggestions">
             <div class="person-name-suggestions" id="person-name-suggestions" role="listbox" hidden></div>
           </div>
           <label class="late-toggle" for="late-checkbox">
@@ -222,9 +226,11 @@
     <div class="people-form">
       <input id="person-first-name" type="text" maxlength="40" placeholder="Nombre" aria-label="Nombre de la persona">
       <input id="person-last-name" type="text" maxlength="40" placeholder="Apellido (opcional)" aria-label="Apellido de la persona">
+      <input id="person-dni" type="text" inputmode="numeric" maxlength="8" pattern="[0-9]{8}" placeholder="DNI de 8 d?gitos" aria-label="DNI">
+      <select id="person-account-type" aria-label="Tipo de persona"><option>Operario</option><option>Capacitado</option></select>
       <button class="save-button people-add-button" id="person-add-button" type="button">Agregar</button>
     </div>
-    <input class="people-search" id="people-search" type="search" placeholder="Buscar nombre" aria-label="Buscar persona registrada">
+    <input class="people-search" id="people-search" type="search" placeholder="Buscar nombre o DNI" aria-label="Buscar persona registrada">
     <div class="people-list" id="people-list"></div>
     <button class="people-reset-button" id="people-reset-button" type="button">Restablecer lista</button>
   </dialog>
@@ -291,6 +297,26 @@
     </form>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-text"></span><span class="toast-progress"></span></div>
-  <script src="app.js?v=login-fix-20260915"></script>
+  <dialog class="profile-dialog" id="profile-dialog" aria-labelledby="profile-title">
+    <div class="dialog-heading"><h2 id="profile-title">Perfil del operario</h2><button class="dialog-close" id="profile-close" type="button" aria-label="Cerrar perfil">&times;</button></div>
+    <form id="profile-form"><input id="profile-id" type="hidden">
+      <label class="worker-label" for="profile-name">Nombre completo</label><input id="profile-name" maxlength="100" required>
+      <label class="worker-label" for="profile-dni">DNI</label><input id="profile-dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" required>
+      <p class="worker-help">Al cambiar el DNI se elimina el PIN anterior y se cierran las sesiones de esa cuenta.</p>
+      <label class="worker-label" for="profile-type">Tipo de persona</label><select id="profile-type"><option>Operario</option><option>Capacitado</option></select>
+      <label class="late-toggle"><input id="profile-active" type="checkbox" style="position:static;opacity:1;width:20px;height:20px">Cuenta activa</label>
+      <p class="pin-display" id="profile-pin"></p><button class="secondary-action" id="profile-pin-show" type="button">Consultar PIN</button>
+      <button class="primary-button" id="profile-save" type="submit">Guardar perfil</button><p id="profile-message" role="status"></p>
+    </form>
+  </dialog>
+  <dialog class="qr-dialog" id="qr-dialog" aria-labelledby="qr-title">
+    <div class="dialog-heading"><h2 id="qr-title">QR de asistencia</h2><button class="dialog-close" id="qr-close" aria-label="Cerrar QR">&times;</button></div>
+    <div class="qr-poster"><h3>SPLASH SEDE LAS FLORES</h3><div id="base-qr"></div><h3>Registra tu asistencia</h3><p>Escanea e ingresa con tu DNI y PIN.</p></div>
+    <p id="qr-message" role="status"></p><div class="qr-actions"><button class="secondary-action" id="qr-print" disabled>Imprimir</button><button class="secondary-action" id="qr-download" disabled>Descargar imagen</button><button class="secondary-action" id="qr-rotate">Reemplazar QR</button></div>
+  </dialog>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=qr-1"></script>
+  <script src="vendor/qrcode.min.js"></script>
+  <script src="app.js?v=qr-1"></script>
+  <script src="admin-qr.js?v=qr-1"></script>
 </body>
 </html>

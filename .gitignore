@@ -2,3 +2,4 @@
 registros.db
 __pycache__/
 *.log
+node_modules/

@@ -1,0 +1,46 @@
+# Asistencia por QR · SPLASH SEDE LAS FLORES
+
+## Activación en Supabase
+
+1. Publica los archivos de este cambio en el mismo sitio HTTPS de administración.
+2. En el SQL Editor del proyecto `yyhvpbgvmnhonyqzevfr`, ejecuta completo `migrations/20260915_qr_attendance.sql`. Requiere las tablas del esquema existente. No vuelvas a ejecutar `supabase-schema.sql` después: sus políticas antiguas permiten acceso público a las asistencias.
+3. Guarda en privado el resultado `usuario` / `clave_inicial`. Se entrega solo en la primera ejecución. Esta es la nueva clave de `admin`; reemplaza el acceso que antes se verificaba dentro del navegador. No subas esa clave a GitHub ni la compartas en el chat.
+4. Recarga la página de administración e inicia sesión con esa clave. En **Personas registradas**, abre cada **Perfil** y completa su DNI real de ocho dígitos. No se inventan DNI. Los nombres históricos se importan automáticamente; al ingresar también se importa el padrón local de ese navegador.
+5. En el menú, abre **QR de asistencia** desde la URL HTTPS definitiva. Descarga la imagen o imprímela y colócala en la base.
+
+La migración es transaccional y puede repetirse. Conserva los registros, cuentas, PIN y la clave si ya estaba activada. Antes de ejecutarla, el administrador conserva el acceso anterior; los operarios verán que falta activar el sistema.
+
+## Uso de operarios
+
+- Página independiente: `operarios.html`. También hay un enlace desde el login de administradores.
+- Primera vez: escanear el QR físico, ingresar el DNI registrado y pulsar **Iniciar sesión**. Crear y confirmar un PIN de cuatro dígitos, incluidos PIN que empiezan por cero.
+- Después de ingresar: **Registrar asistencia** o **Mis asistencias**.
+- Registrar: abrir la cámara integrada o escanear con la cámara del teléfono, y pulsar **Confirmar mi asistencia**. Abrir el enlace por sí solo no registra una llegada.
+- La fecha y hora del QR se calculan en el servidor, zona `America/Lima`. No hay una hora de tardanza configurada; la llegada QR comienza sin marca de tarde y el administrador puede editarla.
+- Cada cuenta puede registrar una llegada por fecha. Si ya hay una llegada manual, el QR informa que ya está registrada.
+- Cada operario solo consulta su historial, incluidas llegadas manuales asociadas a su perfil.
+
+## Administración
+
+- Agregar cuentas con nombre, DNI y tipo; editar perfiles y desactivar cuentas desde el perfil.
+- El registro manual admite únicamente nombres del padrón. Los perfiles importados pueden usarse manualmente mientras se completan sus DNI.
+- **Consultar PIN** muestra el PIN dentro del perfil. Se guarda cifrado en una tabla privada; no aparece en las listas ni en los eventos de tiempo real. Cada consulta deja una fecha en `pin_access_log`.
+- Cambiar el DNI elimina el PIN anterior y revoca las sesiones de esa cuenta. Desactivar una cuenta bloquea sus siguientes solicitudes.
+- **Reemplazar QR** invalida el código anterior. Debe imprimirse nuevamente.
+- Supabase Realtime avisa de cambios sin incluir datos personales; la página consulta los registros mediante su sesión. Hay consulta de respaldo cada tres segundos. Mientras hay una edición o guardado pendiente no se reemplaza la vista local.
+- Si otro dispositivo modificó el registro desde que se leyó, se rechaza el guardado antiguo y se solicita actualizar/repetir el cambio, para no borrar nuevas llegadas QR.
+
+## Alcance y operación
+
+- Requiere internet y HTTPS para registrar y usar la cámara. No muestra éxito si la solicitud no se confirma.
+- El QR impreso es reutilizable hasta reemplazarlo. Una fotografía puede reutilizarse fuera de la base; no prueba ubicación física. La primera activación requiere DNI más ese QR, sin validación de identidad adicional.
+- Sesiones de 12 horas, PIN verificado con bcrypt, cinco intentos fallidos por cuenta cada 15 minutos. El PIN cifrado y la clave de cifrado solo existen en el esquema privado del servidor.
+- No se modifica la integración de inventario. La migración protege el acceso a `daily_records` y las cuentas nuevas; no es una revisión completa de permisos del resto del sistema.
+- El servidor Python antiguo no gestiona estas cuentas: el navegador llama directamente a las funciones de Supabase. No usar sus endpoints antiguos para escribir asistencias tras la migración, pues no aplican el control de versiones del flujo nuevo.
+- No se ha ejecutado esta migración en producción desde la sesión del asistente: no hay navegador ni conector Supabase accesible. La activación y la prueba de cámara/impresión real quedan pendientes hasta ejecutar el SQL.
+
+## Comprobación
+
+`npm ci` y `npm test`. Las pruebas usan PostgreSQL aislado (PGlite con pgcrypto real) y DOM simulado (jsdom); no acceden a datos de producción. Cubren permisos, PIN, activación, duplicados, cambios concurrentes, historial, invalidación del QR, atomicidad y los flujos de las dos páginas.
+
+Las bibliotecas se incluyen localmente, con versiones fijas y licencias en `vendor/`: QRCode.js 1.0.0, jsQR 1.4.0 y supabase-js 2.57.4. El canal usa [Broadcast de Supabase](https://supabase.com/docs/guides/realtime/broadcast); las funciones siguen la configuración de permisos y `search_path` de la [documentación de funciones](https://supabase.com/docs/guides/database/functions).

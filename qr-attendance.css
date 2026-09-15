@@ -1,0 +1,50 @@
+[hidden] { display: none !important; }
+.login-card .login-field { display: grid; margin: 18px 0 0; }
+.login-field > label { display: block; margin: 0; font-size: inherit; }
+.login-card input[type="text"], .login-card input[type="password"] { height: 54px; border: 1px solid rgba(135,196,205,.38); border-radius: 14px; background: rgba(255,255,255,.62); }
+.login-card input[type="text"]:focus, .login-card input[type="password"]:focus { border-color: #008c95; background: rgba(255,255,255,.82); box-shadow: 0 0 0 3px rgba(24,174,178,.12); }
+.login-card .worker-label { margin: 18px 0 8px; }
+.portal-link { display: block; margin-top: 18px; color: #006b73; font-size: .86rem; text-align: center; text-underline-offset: 4px; }
+.worker-label { display: block; margin: 18px 0 8px; color: #102f49; font-weight: 600; font-size: .9rem; }
+.worker-help { color: #627d8d; font-size: .82rem; line-height: 1.6; }
+.worker-shell { width: min(880px, calc(100% - 32px)); margin: 48px auto; }
+.worker-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 32px; }
+.worker-header .login-kicker { text-align: left; }
+.worker-header h1 { font-size: clamp(1.6rem, 5vw, 2.4rem); margin: 8px 0; }
+.worker-menu { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.worker-menu-card, .worker-panel { padding: 28px; border: 1px solid #fff; border-radius: 24px; background: rgba(255,255,255,.7); box-shadow: 0 14px 40px #102f4910; }
+.worker-menu-card { display: grid; gap: 12px; color: #008c95; text-align: left; transition: transform .2s; }
+.worker-menu-card:hover { transform: translateY(-2px); }
+.worker-menu-card strong { color: #102f49; font-size: 1.2rem; }
+.worker-menu-card span { color: #627d8d; line-height: 1.5; }
+.worker-panel { margin-top: 24px; }
+.worker-panel p { line-height: 1.6; }
+.worker-panel video { width: 100%; max-height: 360px; border-radius: 16px; background: #102f49; margin-bottom: 16px; }
+.secondary-action { padding: 11px 16px; border: 1px solid #bfdde0; border-radius: 10px; background: #fff; color: #006b73; font-weight: 600; }
+.worker-panel .secondary-action { margin: 12px 0; }
+.worker-attendance-row { display: flex; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid #dce9ec; }
+.worker-attendance-row small { display: block; color: #627d8d; margin-top: 4px; }
+.qr-dialog, .profile-dialog { width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 26px; border: 0; border-radius: 24px; color: #102f49; }
+.qr-dialog::backdrop, .profile-dialog::backdrop { background: #102f4966; backdrop-filter: blur(4px); }
+.profile-dialog input, .profile-dialog select { width: 100%; height: 46px; border: 1px solid #bfdde0; border-radius: 8px; padding: 0 12px; }
+.profile-dialog .primary-button { margin-top: 20px; }
+.qr-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.qr-poster { padding: 24px; margin-top: 18px; text-align: center; background: #fff; color: #102f49; border: 1px solid #dce9ec; border-radius: 16px; }
+.qr-poster h3 { margin: 0 0 12px; }
+#base-qr { display: grid; place-items: center; padding: 24px; }
+#base-qr img, #base-qr canvas { max-width: 100%; height: auto; }
+.people-item { flex-wrap: wrap; }
+.people-item-actions { flex-wrap: wrap; }
+.pin-display { padding: 12px; background: #edf8f8; border-radius: 8px; letter-spacing: .12em; }
+.sync-indicator { color: #627d8d; font-size: .75rem; }
+button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 540px) { .worker-menu { grid-template-columns: 1fr; } .worker-header { align-items: flex-start; flex-direction: column; } .worker-shell { margin: 24px auto; } .worker-menu-card, .worker-panel { padding: 22px; } }
+@media (prefers-reduced-motion: reduce) { .worker-menu-card { transition: none; } }
+@media print {
+  body > * { display: none !important; }
+  body > #qr-dialog[open] { display: block !important; position: static; width: 100%; max-height: none; border: 0; padding: 0; }
+  #qr-dialog > :not(.qr-poster) { display: none !important; }
+  #qr-dialog::backdrop { background: transparent; }
+  .qr-poster { border: 0; margin: 40px auto; max-width: 500px; }
+  #base-qr img { display: block !important; } #base-qr canvas { display: none !important; }
+}

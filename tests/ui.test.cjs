@@ -1,0 +1,128 @@
+const {test} = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const {JSDOM, VirtualConsole} = require('jsdom');
+const flush = async () => { for(let i=0;i<15;i++) await new Promise(resolve => setImmediate(resolve)); };
+
+function page(file, handler) {
+  const dom = new JSDOM(fs.readFileSync(file,'utf8'), {url:`https://example.com/${file}`,runScripts:'outside-only',virtualConsole:new VirtualConsole()});
+  const w=dom.window;
+  w.Response=Response;
+  w.fetch=async (url, options={}) => {
+    const result = url.includes('/rpc/splash_api') ? await handler(JSON.parse(options.body)) : [];
+    return new Response(JSON.stringify(result),{status:200});
+  };
+  w.setInterval=()=>0;
+  w.cancelAnimationFrame=()=>{};
+  w.HTMLDialogElement.prototype.showModal=function(){ this.open=true; };
+  w.HTMLDialogElement.prototype.close=function(){ this.open=false; this.dispatchEvent(new w.Event('close')); };
+  w.HTMLCanvasElement.prototype.getContext=()=>({});
+  w.HTMLElement.prototype.scrollIntoView=()=>{};
+  w.eval(fs.readFileSync('splash-api.js','utf8'));
+  return dom;
+}
+
+test('Admin usa la API autenticada, rechaza nombres libres y abre perfiles', async t=>{
+  const calls=[];
+  const people=[{id:'00000000-0000-0000-0000-000000000001',name:'Persona registrada',dni:'00000001',type:'Operario',active:true,has_pin:true}];
+  const dom=page('index.html',request=>{
+    calls.push(request);
+    switch(request.action){
+      case 'status':return {ready:true};
+      case 'admin_login':return {token:'admin-session'};
+      case 'people':return people;
+      case 'records':return request.payload.date ? null : [];
+      case 'person_pin':return {pin:'0123'};
+      default:return {ok:true};
+    }
+  });
+  t.after(()=>dom.window.close());
+  const w=dom.window, $=id=>w.document.getElementById(id);
+  vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());
+  $('login-user').value='admin'; $('login-password').value='test-only';
+  $('login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+  await flush();
+  assert.equal($('login-screen').hidden,true);
+  assert.ok(calls.some(c=>c.action==='records' && c.token==='admin-session'));
+  $('person-name').value='Persona desconocida';
+  $('arrival-form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+  assert.match($('form-message').textContent,/Primero registra/);
+  assert.equal($('arrival-list').children.length,0);
+  $('person-name').value='Persona registrada';
+  $('arrival-form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+  assert.equal($('arrival-list').children.length,1);
+  $('people-list').querySelector('[data-profile]').click();
+  assert.equal($('profile-dialog').open,true);
+  assert.equal($('profile-dni').value,'00000001');
+  $('profile-pin-show').click();await flush();
+  assert.equal($('profile-pin').textContent,'PIN: 0123');
+  $('profile-close').click();assert.equal($('profile-pin').textContent,'');
+});
+
+test('Operario crea PIN y confirma QR sin registrar al abrir el enlace', async t=>{
+  const calls=[];
+  const dom=page('operarios.html',request=>{
+    calls.push(request);
+    switch(request.action){
+      case 'worker_login':return {needs_pin:true};
+      case 'activate':return {token:'worker-session'};
+      case 'me':return {name:'Operario de prueba',dni:'00000001'};
+      case 'checkin':return {ok:true,message:'Asistencia registrada correctamente.'};
+      case 'my_attendance':return [{date:'2026-09-15',time:'08:15',source:'QR'}];
+    }
+  });
+  t.after(()=>dom.window.close());
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.location.hash=`base=${'a'.repeat(64)}`;
+  w.eval(fs.readFileSync('operarios.js','utf8'));
+  $('worker-dni').value='00000001';
+  $('worker-login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
+  assert.equal($('pin-confirm-wrap').hidden,false);
+  $('worker-pin').value='0123';$('worker-pin-confirm').value='9999';
+  $('worker-login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
+  assert.equal(calls.filter(c=>c.action==='activate').length,0);
+  $('worker-pin-confirm').value='0123';
+  $('worker-login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
+  assert.equal($('worker-home').hidden,false);
+  assert.equal(calls.filter(c=>c.action==='checkin').length,0);
+  $('confirm-checkin').click();await flush();
+  assert.equal(calls.filter(c=>c.action==='checkin').length,1);
+  assert.equal(calls.find(c=>c.action==='checkin').token,'worker-session');
+  assert.match($('checkin-message').textContent,/correctamente/);
+  $('open-history').click();await flush();
+  assert.match($('worker-history').textContent,/15\/09\/2026/);
+  assert.equal(w.location.hash,'');
+});
+
+test('El lector solo acepta QR de la página y del sitio correctos',()=>{
+  const dom=page('operarios.html',()=>({}));
+  const {Splash}=dom.window;
+  assert.equal(Splash.readQR(`https://example.com/operarios.html#base=${'a'.repeat(64)}`),'a'.repeat(64));
+  assert.equal(Splash.readQR(`https://other.example/operarios.html#base=${'a'.repeat(64)}`),'');
+  assert.equal(Splash.readQR('javascript:alert(1)'),'');
+  assert.equal(Splash.readQR('https://example.com/operarios.html#base=1234'),'');
+  dom.window.close();
+});
+
+test('El QR generado puede decodificarse con el lector incluido',()=>{
+  const dom=page('operarios.html',()=>({}));
+  const w=dom.window;
+  w.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},fillRect(){},strokeRect(){}});
+  w.eval(fs.readFileSync('vendor/qrcode.min.js','utf8'));
+  const url=`https://example.com/operarios.html#base=${'a'.repeat(64)}`;
+  const qr=new w.QRCode(w.document.createElement('div'),{text:url,width:280,height:280,correctLevel:w.QRCode.CorrectLevel.M});
+  const count=qr._oQRCode.getModuleCount(), scale=8, border=4;
+  const size=(count+border*2)*scale;
+  const pixels=new Uint8ClampedArray(size*size*4).fill(255);
+  for(let row=0;row<count;row++) for(let col=0;col<count;col++) if(qr._oQRCode.isDark(row,col)) {
+    for(let y=0;y<scale;y++) for(let x=0;x<scale;x++) {
+      const offset=(((row+border)*scale+y)*size+(col+border)*scale+x)*4;
+      pixels[offset]=pixels[offset+1]=pixels[offset+2]=0;
+    }
+  }
+  const decode=require('../vendor/jsQR.js');
+  assert.equal(decode(pixels,size,size).data,url);
+  dom.window.close();
+});
