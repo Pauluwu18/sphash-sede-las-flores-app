@@ -27,9 +27,9 @@ En instalaciones existentes, ejecutar `migrations/20260915_admin_without_lockout
 - El escáner solicita la cámara al pulsar **Abrir cámara**, con visor y guía de tres pasos. Muestra estados de espera, lectura y confirmación, y permite reintentar si se deniega el permiso. Si no responde en 15 segundos libera la interfaz; cualquier cámara concedida después de cancelar se cierra.
 - **Tomar foto del QR** permite usar la captura de imagen del teléfono o seleccionar una foto, según el navegador. La imagen se decodifica localmente y aún requiere confirmar la asistencia. La guía de permisos permite copiar un enlace limpio, sin sesión ni token QR, para abrir el escáner en otro navegador.
 - Un permiso bloqueado por el navegador o por la aplicación instalada debe habilitarse en sus ajustes. La página no puede concedérselo a sí misma. Ver [comportamiento de getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia).
-- El historial muestra fecha, hora y origen del registro. Permite filtrar por mes, ver todas y actualizar; incluye total mostrado y última llegada.
+- El historial muestra fecha, hora, origen y puntualidad del registro. Permite filtrar por mes, ver todas y actualizar; incluye total mostrado y última llegada.
 - Registrar: abrir la cámara integrada o escanear con la cámara del teléfono, y pulsar **Confirmar mi asistencia**. Abrir el enlace por sí solo no registra una llegada.
-- La fecha y hora del QR se calculan en el servidor, zona `America/Lima`. No hay una hora de tardanza configurada; la llegada QR comienza sin marca de tarde y el administrador puede editarla.
+- La fecha y hora del QR se calculan en el servidor, zona `America/Lima`. Las llegadas hasta las `07:44` se muestran como **Temprano** y desde las `07:45` inclusive como **Tardanza**, tanto para el operario como en la asistencia administrativa.
 - Cada cuenta puede registrar una llegada por fecha. Si ya hay una llegada manual, el QR informa que ya está registrada.
 - Cada operario solo consulta su historial, incluidas llegadas manuales asociadas a su perfil.
 

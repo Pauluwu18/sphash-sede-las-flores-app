@@ -70,7 +70,7 @@ test('Operario crea PIN y confirma QR sin registrar al abrir el enlace', async t
       case 'activate':return {token:'worker-session'};
       case 'me':return {name:'Operario de prueba',dni:'00000001'};
       case 'checkin':return {ok:true,message:'Asistencia registrada correctamente.'};
-      case 'my_attendance':return [{date:'2026-09-15',time:'08:15',source:'QR'}];
+      case 'my_attendance':return [{date:'2026-09-15',time:'08:15',source:'QR',late:true}];
     }
   });
   t.after(()=>dom.window.close());
@@ -91,10 +91,11 @@ test('Operario crea PIN y confirma QR sin registrar al abrir el enlace', async t
   assert.equal(calls.filter(c=>c.action==='checkin').length,1);
   assert.equal(calls.find(c=>c.action==='checkin').token,'worker-session');
   assert.match($('checkin-message').textContent,/correctamente/);
-  assert.equal($('open-history').getAttribute('target'),'_blank');
-  assert.equal($('open-checkin').getAttribute('target'),'_blank');
+  assert.equal($('open-history').tagName,'BUTTON');
+  assert.equal($('open-checkin').tagName,'BUTTON');
   $('history-refresh').click();await flush();
   assert.match($('worker-history').textContent,/15\/09\/2026/);
+  assert.match($('worker-history').textContent,/Tardanza/);
   assert.equal(w.location.hash,'');
 });
 
@@ -136,6 +137,21 @@ test('La página de historial reutiliza sesión y filtra por mes', async t=>{
   w.dispatchEvent(new w.StorageEvent('storage',{key:'splash-worker-session',newValue:null}));
   assert.equal($('worker-home').hidden,true);
   assert.equal($('worker-history').children.length,0);
+});
+
+test('El historial marca tardanza QR desde las 07:45 aunque sea un registro anterior', async t=>{
+  const dom=page('operarios.html',request=>{
+    if(request.action==='me') return {name:'Operario'};
+    if(request.action==='my_attendance') return [{date:'2026-09-15',time:'07:45',source:'QR',late:false}];
+  });
+  t.after(()=>dom.window.close());
+  dom.reconfigure({url:'https://example.com/operarios.html?view=history'});
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.eval(fs.readFileSync('operarios.js','utf8')); await flush();
+  const status=$('worker-history').querySelector('.attendance-status');
+  assert.equal(status.textContent,'Tardanza');
+  assert.ok(status.classList.contains('is-late'));
 });
 
 test('La página de escaneo abre cámara y permite reintentar si se deniega', async t=>{

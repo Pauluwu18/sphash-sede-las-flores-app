@@ -6,7 +6,7 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=scanner-4"><link rel="stylesheet" href="qr-attendance.css?v=scanner-4">
+  <link rel="stylesheet" href="styles.css?v=scanner-5"><link rel="stylesheet" href="qr-attendance.css?v=scanner-5">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -27,11 +27,11 @@
   </div>
   <main class="worker-shell" id="worker-home" hidden>
     <header class="worker-header"><div><p class="login-kicker">SPLASH SEDE LAS FLORES</p><h1 id="worker-name">Mi asistencia</h1></div><button class="secondary-action" id="worker-logout">Cerrar sesión</button></header>
-    <p id="worker-menu-hint" class="worker-help">Elige una opción. Se abrirá en otra pestaña.</p>
+    <p id="worker-menu-hint" class="worker-help">Elige una opción para continuar.</p>
     <a id="worker-back" class="secondary-action" href="operarios.html" hidden>Volver al menú</a>
     <nav class="worker-menu" id="worker-menu" aria-label="Menú de operario">
-      <a class="worker-menu-card" id="open-checkin" href="operarios.html?view=scan" target="_blank" rel="noopener"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M8 8h3v3H8zm6 0h2v3h-2zm-6 6h3v2H8zm6 0h2v2h-2z"/></svg><strong>Escanear QR</strong><span>Escanea el QR físico de la base.</span></a>
-      <a class="worker-menu-card" id="open-history" href="operarios.html?view=history" target="_blank" rel="noopener"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 3 3 5-5"/></svg><strong>Mis asistencias</strong><span>Consulta tus fechas y horas de llegada.</span></a>
+      <button class="worker-menu-card" id="open-checkin" type="button"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M8 8h3v3H8zm6 0h2v3h-2zm-6 6h3v2H8zm6 0h2v2h-2z"/></svg><strong>Escanear QR</strong><span>Escanea el QR físico de la base.</span></button>
+      <button class="worker-menu-card" id="open-history" type="button"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 3 3 5-5"/></svg><strong>Mis asistencias</strong><span>Consulta tus fechas y horas de llegada.</span></button>
     </nav>
     <section class="worker-panel" id="checkin-panel" hidden aria-labelledby="checkin-title">
       <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Escanear QR</h2>
@@ -59,6 +59,6 @@
       <p id="worker-history-message" role="status" aria-live="polite"></p><div id="worker-history"></div>
     </section>
   </main>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=scanner-4"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=scanner-4"></script>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=scanner-5"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=scanner-5"></script>
 </body>
 </html>

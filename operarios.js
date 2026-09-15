@@ -143,7 +143,8 @@
     $('worker-history').innerHTML = rows.map(row => {
       const [year, month, day] = row.date.split('-');
       const weekday = new Intl.DateTimeFormat('es-PE', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${row.date}T12:00:00Z`));
-      return `<article class="worker-attendance-row"><div><small class="attendance-weekday">${Splash.escape(weekday)}</small><strong>${day}/${month}/${year}</strong><small>${row.source === 'QR' ? 'Registrada con QR' : 'Registrada por administración'}</small></div><div class="attendance-time"><small>Hora de llegada</small><strong>${Splash.escape(row.time)}</strong><span>Registrada</span></div></article>`;
+      const late = row.late === true || (row.source === 'QR' && row.time >= '07:45');
+      return `<article class="worker-attendance-row"><div><small class="attendance-weekday">${Splash.escape(weekday)}</small><strong>${day}/${month}/${year}</strong><small>${row.source === 'QR' ? 'Registrada con QR' : 'Registrada por administración'}</small></div><div class="attendance-time"><small>Hora de llegada</small><strong>${Splash.escape(row.time)}</strong><span class="attendance-status ${late ? 'is-late' : 'is-early'}">${late ? 'Tardanza' : 'Temprano'}</span></div></article>`;
     }).join('');
     $('worker-history-message').textContent = rows.length ? 'Tus asistencias están actualizadas.' : month ? 'No tienes asistencias registradas en este mes. Puedes elegir otro mes o ver todas.' : 'Aún no tienes asistencias. Escanea el QR de la base para registrar tu primera llegada.';
   }
@@ -160,6 +161,8 @@
   $('worker-month').addEventListener('change', renderHistory);
   $('history-all').addEventListener('click', () => { $('worker-month').value = ''; renderHistory(); });
   $('history-refresh').addEventListener('click', loadHistory);
+  $('open-checkin').addEventListener('click', () => location.assign('operarios.html?view=scan'));
+  $('open-history').addEventListener('click', () => location.assign('operarios.html?view=history'));
 
   $('start-camera').addEventListener('click', async () => {
     stopCamera();

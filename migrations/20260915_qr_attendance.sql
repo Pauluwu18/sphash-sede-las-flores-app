@@ -41,8 +41,10 @@ create table if not exists splash_private.checkins (
   work_date date not null,
   checked_at timestamptz not null default now(),
   source text not null check (source in ('QR','Manual')),
+  late boolean not null default false,
   primary key (person_id, work_date)
 );
+alter table splash_private.checkins add column if not exists late boolean not null default false;
 create table if not exists splash_private.pin_access_log (
   person_id uuid references splash_private.people(id),
   accessed_at timestamptz not null default now()
@@ -94,6 +96,11 @@ begin
   if missing is not null then result := result || E'\n*Faltas*\n' || missing; end if;
   return result;
 end $$;
+
+create or replace function splash_private.attendance_late(p_checked_at timestamptz)
+returns boolean language sql immutable set search_path = '' as $$
+  select (p_checked_at at time zone 'America/Lima')::time >= time '07:45';
+$$;
 
 create or replace function public.splash_api(action text, payload jsonb default '{}'::jsonb, token text default '')
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -167,7 +174,8 @@ begin
     if person.id is null then return jsonb_build_object('error','Cuenta desactivada.','code','SESSION'); end if;
     if action='me' then return jsonb_build_object('name',person.name,'dni',person.dni); end if;
     if action='my_attendance' then
-      select coalesce(jsonb_agg(jsonb_build_object('date',work_date,'time',to_char(checked_at at time zone 'America/Lima','HH24:MI'),'source',source) order by work_date desc),'[]'::jsonb)
+      select coalesce(jsonb_agg(jsonb_build_object('date',work_date,'time',to_char(checked_at at time zone 'America/Lima','HH24:MI'),'source',source,
+        'late',case when source='QR' then splash_private.attendance_late(checked_at) else late end) order by work_date desc),'[]'::jsonb)
       into result from splash_private.checkins where person_id=person.id;
       return result;
     end if;
@@ -182,10 +190,11 @@ begin
     if existing is not null or exists(select 1 from splash_private.checkins where person_id=person.id and work_date=work_day) then
       return jsonb_build_object('already',true,'message','Tu asistencia de hoy ya está registrada.');
     end if;
-    item := jsonb_build_object('personId',person.id,'name',person.name,'type',person.person_type,'late',false,'active',true,
+    item := jsonb_build_object('personId',person.id,'name',person.name,'type',person.person_type,'late',splash_private.attendance_late(now()),'active',true,
       'arrivalTime',to_char(now() at time zone 'America/Lima','HH24:MI'),'departureTime','','source','QR');
     merged := rec.arrivals || jsonb_build_array(item);
-    insert into splash_private.checkins(person_id,work_date,source) values(person.id,work_day,'QR');
+    insert into splash_private.checkins(person_id,work_date,source,late)
+      values(person.id,work_day,'QR',splash_private.attendance_late(now()));
     update public.daily_records set arrivals=merged,report=splash_private.report(merged,day_key,rec.report) where record_date=day_key;
     return jsonb_build_object('ok',true,'message','Asistencia registrada correctamente.');
   end if;
@@ -272,11 +281,13 @@ begin
         if item->>'personId' is not null then
           select a into old_item from jsonb_array_elements(coalesce(rec.arrivals,'[]'::jsonb)) a
             where a->>'personId'=item->>'personId' limit 1;
-          insert into splash_private.checkins(person_id,work_date,checked_at,source)
+          insert into splash_private.checkins(person_id,work_date,checked_at,source,late)
             values((item->>'personId')::uuid,to_date(day_key,'DD/MM/YYYY'),
               (to_date(day_key,'DD/MM/YYYY') + coalesce(nullif(item->>'arrivalTime','')::time,'00:00'::time)) at time zone 'America/Lima',
-              case when old_item->>'source'='QR' then 'QR' else 'Manual' end)
-            on conflict(person_id,work_date) do nothing;
+              case when old_item->>'source'='QR' then 'QR' else 'Manual' end,
+              coalesce((item->>'late')::boolean,false))
+            on conflict(person_id,work_date) do update set
+              checked_at=excluded.checked_at,source=excluded.source,late=excluded.late;
         end if;
       end loop;
       delete from splash_private.checkins c where work_date=to_date(day_key,'DD/MM/YYYY') and not exists(

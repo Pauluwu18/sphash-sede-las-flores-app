@@ -53,7 +53,9 @@ body:has(#checkin-panel:not([hidden])) #worker-logout { font-size: .78rem; paddi
 .history-summary-cards span { font-size: .8rem; color: #627d8d; }
 .attendance-time { text-align: right; }
 .attendance-time strong { font-size: 1.3rem; }
-.attendance-time span { display: block; margin-top: 6px; font-size: .75rem; color: #176349; }
+.attendance-time .attendance-status { display: block; margin-top: 6px; font-size: .75rem; font-weight: 700; }
+.attendance-time .attendance-status.is-early { color: #176349; }
+.attendance-time .attendance-status.is-late { color: #a84731; }
 .worker-attendance-row .attendance-weekday { text-transform: capitalize; margin: 0 0 6px; }
 @media (max-width: 400px) { .scan-steps { grid-template-columns: 1fr; } .history-summary-cards { grid-template-columns: 1fr; } }
 .worker-menu-card:hover { transform: translateY(-2px); }

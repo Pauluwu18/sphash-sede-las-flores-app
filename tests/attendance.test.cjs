@@ -59,8 +59,15 @@ test('Migración y flujos de asistencia sobre PostgreSQL aislado', async t => {
     assert.match(record.report,/Operario de prueba/);
     const history = await api('my_attendance',{},worker.token);
     assert.equal(history.length,1); assert.equal(history[0].source,'QR');
+    assert.equal(typeof history[0].late,'boolean');
     assert.ok((await api('people',{},worker.token)).error);
     assert.ok((await api('records',{},worker.token)).error);
+  });
+  await t.test('la puntualidad cambia a tardanza desde las 07:45 de Lima', async () => {
+    const punctual = await db.query("select splash_private.attendance_late('2026-09-15 12:44:00+00'::timestamptz) late");
+    const late = await db.query("select splash_private.attendance_late('2026-09-15 12:45:00+00'::timestamptz) late");
+    assert.equal(punctual.rows[0].late,false);
+    assert.equal(late.rows[0].late,true);
   });
   await t.test('un guardado antiguo no pisa una llegada QR; solo padrón para manual', async () => {
     const old = await api('records',{date:today},admin.token);
