@@ -123,4 +123,20 @@ test('Migración y flujos de asistencia sobre PostgreSQL aislado', async t => {
     assert.equal((await api('people',{},admin.token)).code,'SESSION');
     assert.ok((await api('admin_login',{username:'admin',password:initial})).error);
   });
+  await t.test('la actualización elimina el bloqueo de admin sin omitir su contraseña', async () => {
+    const definition = (await db.query("select pg_get_functiondef('public.splash_api(text,jsonb,text)'::regprocedure) definition")).rows[0].definition;
+    await db.exec(definition.replace("if action <> 'admin_login' and attempts.failures >= 5 then", 'if attempts.failures >= 5 then'));
+    await db.exec("update splash_private.login_attempts set failures=8,window_start=now() where account='admin'");
+    assert.match((await api('admin_login',{username:'admin',password:'test-admin-9876'})).error,/15 minutos/);
+    const patch = fs.readFileSync('migrations/20260915_admin_without_lockout.sql','utf8');
+    await db.exec(patch);
+    for (let i=0;i<7;i++) {
+      assert.equal((await api('admin_login',{username:'admin',password:'incorrecta'})).error,'Usuario o contraseña incorrectos.');
+    }
+    assert.ok((await api('admin_login',{username:'admin',password:'test-admin-9876'})).token);
+    await db.exec(patch);
+    assert.ok((await api('admin_login',{username:'admin',password:'test-admin-9876'})).token);
+    const finalDefinition=(await db.query("select pg_get_functiondef('public.splash_api(text,jsonb,text)'::regprocedure) definition")).rows[0].definition;
+    assert.ok(finalDefinition.includes("if action <> 'admin_login' and attempts.failures >= 5 then"));
+  });
 });

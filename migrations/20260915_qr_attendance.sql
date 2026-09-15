@@ -120,7 +120,7 @@ begin
       update splash_private.login_attempts set failures=0, window_start=now() where account=account_key;
       attempts.failures := 0;
     end if;
-    if attempts.failures >= 5 then return jsonb_build_object('error','Demasiados intentos. Espera 15 minutos.'); end if;
+    if action <> 'admin_login' and attempts.failures >= 5 then return jsonb_build_object('error','Demasiados intentos. Espera 15 minutos.'); end if;
     if action = 'admin_login' then
       secret := payload->>'password';
       if payload->>'username' is distinct from 'admin' or secret is null or

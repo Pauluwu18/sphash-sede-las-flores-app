@@ -14,6 +14,10 @@ La migración es transaccional y puede repetirse. Conserva los registros, cuenta
 
 Después de la migración principal, copiar `migrations/20260915_admin_password.sql` al SQL Editor y sustituir `REEMPLAZAR_CLAVE_EN_SUPABASE` por la clave solicitada, únicamente en Supabase. No guardar la clave en el repositorio. Esta consulta reemplaza la clave aleatoria inicial, cierra las sesiones de administración y limpia su bloqueo por intentos. No cambia los PIN de operarios ni sus asistencias. La clave queda almacenada como hash bcrypt en Supabase.
 
+### Administradores sin bloqueo temporal
+
+En instalaciones existentes, ejecutar `migrations/20260915_admin_without_lockout.sql` en el SQL Editor. Elimina el bloqueo temporal y limpia los intentos de `admin`, conservando su contraseña. Los operarios siguen sujetos al límite de cinco intentos en 15 minutos. Publicar el archivo en GitHub no lo ejecuta en Supabase.
+
 ## Uso de operarios
 
 - Al abrir el sitio, `index.html` dirige a `operarios.html`. Debajo del login aparece **Entrar como administrador**, que abre `admin.html`.
@@ -41,7 +45,7 @@ Después de la migración principal, copiar `migrations/20260915_admin_password.
 
 - Requiere internet y HTTPS para registrar y usar la cámara. No muestra éxito si la solicitud no se confirma.
 - El QR impreso es reutilizable hasta reemplazarlo. Una fotografía puede reutilizarse fuera de la base; no prueba ubicación física. La primera activación requiere DNI más ese QR, sin validación de identidad adicional.
-- Sesiones de 12 horas, PIN verificado con bcrypt, cinco intentos fallidos por cuenta cada 15 minutos. El PIN cifrado y la clave de cifrado solo existen en el esquema privado del servidor.
+- Sesiones de 12 horas, PIN verificado con bcrypt, cinco intentos fallidos por cuenta de operario cada 15 minutos. Los administradores verifican contraseña sin bloqueo temporal. El PIN cifrado y la clave de cifrado solo existen en el esquema privado del servidor.
 - No se modifica la integración de inventario. La migración protege el acceso a `daily_records` y las cuentas nuevas; no es una revisión completa de permisos del resto del sistema.
 - El servidor Python antiguo no gestiona estas cuentas: el navegador llama directamente a las funciones de Supabase. No usar sus endpoints antiguos para escribir asistencias tras la migración, pues no aplican el control de versiones del flujo nuevo.
 - No se ha ejecutado esta migración en producción desde la sesión del asistente: no hay navegador ni conector Supabase accesible. La activación y la prueba de cámara/impresión real quedan pendientes hasta ejecutar el SQL.
