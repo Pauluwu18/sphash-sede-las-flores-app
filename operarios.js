@@ -6,6 +6,13 @@
   let frame = null;
   let scanGeneration = 0;
   let saving = false;
+  const view = new URLSearchParams(location.search).get('view');
+  let historyRecords = [];
+  let historyLoading = false;
+  // Comparte la sesión entre las páginas del mismo sitio, sin ponerla en la URL.
+  const previousSession = sessionStorage.getItem('splash-worker-session');
+  if (previousSession && !localStorage.getItem('splash-worker-session')) localStorage.setItem('splash-worker-session', previousSession);
+  sessionStorage.removeItem('splash-worker-session');
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { willReadFrequently: true });
   // El token del QR permanece solo en memoria; no se guarda en almacenamiento.
@@ -28,16 +35,50 @@
     $('confirm-checkin').hidden = !qrToken;
     $('start-camera').hidden = !!qrToken;
     $('checkin-message').textContent = qrToken ? 'QR reconocido. Confirma para registrar tu llegada.' : '';
+    $('checkin-message').classList.remove('is-success');
+    $('checkin-history-link').hidden = true;
+    setStep(qrToken ? 'confirm' : 'camera');
+  }
+
+  function setStep(step) {
+    for (const name of ['camera', 'code', 'confirm']) {
+      const item = $(`scan-step-${name}`);
+      if (name === step) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    }
   }
 
   async function enter() {
     const me = await Splash.call('me', {}, 'worker');
+    historyRecords = [];
+    $('worker-history').replaceChildren();
+    $('history-panel').hidden = true;
+    $('checkin-panel').hidden = true;
     $('worker-name').textContent = `Hola, ${me.name}`;
     $('worker-login').hidden = true;
     $('worker-home').hidden = false;
     $('worker-pin').value = '';
     $('worker-pin-confirm').value = '';
-    if (qrToken) showCheckin();
+    activating = false;
+    $('worker-dni').readOnly = false;
+    $('pin-confirm-wrap').hidden = true;
+    $('worker-pin-confirm').required = false;
+    $('worker-submit').textContent = 'Iniciar sesión';
+    $('worker-pin').autocomplete = 'current-password';
+    const separatePage = view === 'scan' || view === 'history' || !!qrToken;
+    $('worker-menu').hidden = separatePage;
+    $('worker-menu-hint').hidden = separatePage;
+    $('worker-back').hidden = !separatePage;
+    if (qrToken || view === 'scan') {
+      showCheckin();
+      document.title = 'Escanear QR · SPLASH';
+      if (!qrToken) $('start-camera').click();
+    } else if (view === 'history') {
+      $('history-panel').hidden = false;
+      $('checkin-panel').hidden = true;
+      document.title = 'Mis asistencias · SPLASH';
+      await loadHistory();
+    }
   }
 
   $('worker-login-form').addEventListener('submit', async event => {
@@ -62,30 +103,37 @@
         $('worker-pin').focus();
         return;
       }
-      sessionStorage.setItem('splash-worker-session', result.token);
+      localStorage.setItem('splash-worker-session', result.token);
       await enter();
     } catch (error) { $('worker-login-message').textContent = error.message; }
     finally { $('worker-submit').disabled = false; }
   });
 
-  $('open-checkin').addEventListener('click', showCheckin);
-  async function loadHistory() {
-    try {
-      const records = await Splash.call('my_attendance', {}, 'worker');
-      $('worker-history').innerHTML = records.map(row => {
-        const [year, month, day] = row.date.split('-');
-        return `<div class="worker-attendance-row"><div><strong>${day}/${month}/${year}</strong><small>${Splash.escape(row.source)}</small></div><strong>${Splash.escape(row.time)}</strong></div>`;
-      }).join('');
-      $('worker-history-message').textContent = records.length ? `${records.length} asistencia(s) registrada(s).` : 'Aún no tienes asistencias registradas.';
-    } catch (error) { $('worker-history-message').textContent = error.message; }
+  function renderHistory() {
+    const month = $('worker-month').value;
+    const rows = historyRecords.filter(row => !month || row.date.startsWith(month));
+    $('history-total').textContent = String(rows.length);
+    $('history-latest').textContent = historyRecords.length ? historyRecords[0].date.split('-').reverse().join('/') : 'Sin registros';
+    $('worker-history').innerHTML = rows.map(row => {
+      const [year, month, day] = row.date.split('-');
+      const weekday = new Intl.DateTimeFormat('es-PE', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${row.date}T12:00:00Z`));
+      return `<article class="worker-attendance-row"><div><small class="attendance-weekday">${Splash.escape(weekday)}</small><strong>${day}/${month}/${year}</strong><small>${row.source === 'QR' ? 'Registrada con QR' : 'Registrada por administración'}</small></div><div class="attendance-time"><small>Hora de llegada</small><strong>${Splash.escape(row.time)}</strong><span>Registrada</span></div></article>`;
+    }).join('');
+    $('worker-history-message').textContent = rows.length ? 'Tus asistencias están actualizadas.' : month ? 'No tienes asistencias registradas en este mes. Puedes elegir otro mes o ver todas.' : 'Aún no tienes asistencias. Escanea el QR de la base para registrar tu primera llegada.';
   }
-  $('open-history').addEventListener('click', () => {
-    stopCamera();
-    $('checkin-panel').hidden = true;
-    $('history-panel').hidden = false;
-    $('worker-history-message').textContent = 'Consultando tus asistencias…';
-    loadHistory();
-  });
+  async function loadHistory() {
+    if (historyLoading) return;
+    historyLoading = true;
+    $('history-refresh').disabled = true;
+    try {
+      historyRecords = (await Splash.call('my_attendance', {}, 'worker')).sort((a, b) => b.date.localeCompare(a.date));
+      renderHistory();
+    } catch (error) { $('worker-history-message').textContent = `No se pudo actualizar: ${error.message}`; }
+    finally { historyLoading = false; $('history-refresh').disabled = false; }
+  }
+  $('worker-month').addEventListener('change', renderHistory);
+  $('history-all').addEventListener('click', () => { $('worker-month').value = ''; renderHistory(); });
+  $('history-refresh').addEventListener('click', loadHistory);
 
   $('start-camera').addEventListener('click', async () => {
     stopCamera();
@@ -102,6 +150,7 @@
       $('stop-camera').hidden = false;
       await video.play();
       $('checkin-message').textContent = 'Apunta la cámara al QR de la base.';
+      setStep('code');
       function scan() {
         if (!stream || generation !== scanGeneration) return;
         if (video.readyState >= 2 && video.videoWidth) {
@@ -124,7 +173,7 @@
       $('checkin-message').textContent = error.name === 'NotAllowedError' ? 'Permite el acceso a la cámara o abre el QR desde la cámara del teléfono.' : error.message;
     }
   });
-  $('stop-camera').addEventListener('click', stopCamera);
+  $('stop-camera').addEventListener('click', () => { stopCamera(); setStep('camera'); $('checkin-message').textContent = 'Cámara cerrada. Pulsa «Abrir cámara» para volver a escanear.'; });
   $('confirm-checkin').addEventListener('click', async () => {
     if (saving || !qrToken) return;
     saving = true;
@@ -132,9 +181,11 @@
     try {
       const result = await Splash.call('checkin', { qr: qrToken }, 'worker');
       $('checkin-message').textContent = result.message;
+      $('checkin-message').classList.add('is-success');
+      $('checkin-history-link').hidden = false;
       qrToken = '';
       $('confirm-checkin').hidden = true;
-      $('start-camera').hidden = false;
+      $('start-camera').hidden = true;
     } catch (error) { $('checkin-message').textContent = `${error.message} No se ha confirmado la asistencia.`; }
     finally { saving = false; $('confirm-checkin').disabled = false; }
   });
@@ -143,6 +194,7 @@
     stopCamera();
     try { await Splash.call('logout', {}, 'worker'); } catch { /* La sesión local se elimina igualmente. */ }
     sessionStorage.removeItem('splash-worker-session');
+    localStorage.removeItem('splash-worker-session');
     location.replace('operarios.html');
   }
   $('worker-logout').addEventListener('click', logout);
@@ -164,5 +216,16 @@
   const stopWatching = Splash.watchAttendance(refreshHistory);
   window.addEventListener('pagehide', stopWatching);
   setInterval(refreshHistory, 3000);
-  if (sessionStorage.getItem('splash-worker-session')) enter().catch(error => { $('worker-login-message').textContent = error.message; });
+  window.addEventListener('storage', event => {
+    if (event.key !== 'splash-worker-session') return;
+    stopCamera();
+    if (event.newValue) location.reload();
+    else {
+      $('worker-home').hidden = true;
+      $('worker-login').hidden = false;
+      $('worker-login-message').textContent = 'La sesión se cerró. Ingresa nuevamente para continuar.';
+      $('worker-history').replaceChildren();
+    }
+  });
+  if (localStorage.getItem('splash-worker-session')) enter().catch(error => { $('worker-login-message').textContent = error.message; });
 })();

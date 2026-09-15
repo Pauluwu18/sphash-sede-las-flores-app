@@ -10,15 +10,18 @@
 
 La migración es transaccional y puede repetirse. Conserva los registros, cuentas, PIN y la clave si ya estaba activada. Antes de ejecutarla, el administrador conserva el acceso anterior; los operarios verán que falta activar el sistema.
 
-## Uso de operarios
-
 ### Clave de administrador solicitada
 
-Después de la migración principal, ejecutar `migrations/20260915_admin_password.sql` para conservar la clave de administrador solicitada por el propietario. Esta consulta reemplaza la clave aleatoria inicial, cierra las sesiones de administración y limpia su bloqueo por intentos. No cambia los PIN de operarios ni sus asistencias. La clave queda almacenada como hash bcrypt en Supabase.
+Después de la migración principal, copiar `migrations/20260915_admin_password.sql` al SQL Editor y sustituir `REEMPLAZAR_CLAVE_EN_SUPABASE` por la clave solicitada, únicamente en Supabase. No guardar la clave en el repositorio. Esta consulta reemplaza la clave aleatoria inicial, cierra las sesiones de administración y limpia su bloqueo por intentos. No cambia los PIN de operarios ni sus asistencias. La clave queda almacenada como hash bcrypt en Supabase.
 
-- Página independiente: `operarios.html`. También hay un enlace desde el login de administradores.
+## Uso de operarios
+
+- Al abrir el sitio, `index.html` dirige a `operarios.html`. Debajo del login aparece **Entrar como administrador**, que abre `admin.html`.
 - Primera vez: escanear el QR físico, ingresar el DNI registrado y pulsar **Iniciar sesión**. Crear y confirmar un PIN de cuatro dígitos, incluidos PIN que empiezan por cero.
-- Después de ingresar: **Registrar asistencia** o **Mis asistencias**.
+- Después de ingresar: **Escanear QR** o **Mis asistencias**. Cada opción abre otra pestaña: `operarios.html?view=scan` o `operarios.html?view=history`.
+- Las pestañas comparten la sesión del operario mediante almacenamiento del mismo sitio, con vencimiento del servidor a las 12 horas. La sesión no se incluye en los enlaces. Al cerrar sesión se revoca el acceso y se ocultan las vistas abiertas en otras pestañas.
+- El escáner solicita la cámara al abrir su página, indica los tres pasos y permite reintentar si se deniega el permiso. Al confirmar muestra el resultado y un enlace al historial.
+- El historial muestra fecha, hora y origen del registro. Permite filtrar por mes, ver todas y actualizar; incluye total mostrado y última llegada.
 - Registrar: abrir la cámara integrada o escanear con la cámara del teléfono, y pulsar **Confirmar mi asistencia**. Abrir el enlace por sí solo no registra una llegada.
 - La fecha y hora del QR se calculan en el servidor, zona `America/Lima`. No hay una hora de tardanza configurada; la llegada QR comienza sin marca de tarde y el administrador puede editarla.
 - Cada cuenta puede registrar una llegada por fecha. Si ya hay una llegada manual, el QR informa que ya está registrada.

@@ -6,7 +6,7 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=qr-1"><link rel="stylesheet" href="qr-attendance.css?v=qr-1">
+  <link rel="stylesheet" href="styles.css?v=worker-2"><link rel="stylesheet" href="qr-attendance.css?v=worker-2">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -22,27 +22,37 @@
       <button class="login-button" id="worker-submit" type="submit">Iniciar sesión</button>
       <p class="login-message" id="worker-login-message" role="status"></p>
       <p class="worker-help">¿Primera vez? Tu administrador debe registrar tu DNI. Escanea el QR de la base para crear tu PIN.</p>
-      <a class="portal-link" href="index.html">Acceso de administradores</a>
+      <a class="portal-link" href="admin.html">Entrar como administrador</a>
     </form>
   </div>
   <main class="worker-shell" id="worker-home" hidden>
     <header class="worker-header"><div><p class="login-kicker">SPLASH SEDE LAS FLORES</p><h1 id="worker-name">Mi asistencia</h1></div><button class="secondary-action" id="worker-logout">Cerrar sesión</button></header>
-    <nav class="worker-menu" aria-label="Menú de operario">
-      <button class="worker-menu-card" id="open-checkin" type="button"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M8 8h3v3H8zm6 0h2v3h-2zm-6 6h3v2H8zm6 0h2v2h-2z"/></svg><strong>Registrar asistencia</strong><span>Escanea el QR físico de la base.</span></button>
-      <button class="worker-menu-card" id="open-history" type="button"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 3 3 5-5"/></svg><strong>Mis asistencias</strong><span>Consulta tus fechas y horas de llegada.</span></button>
+    <p id="worker-menu-hint" class="worker-help">Elige una opción. Se abrirá en otra pestaña.</p>
+    <a id="worker-back" class="secondary-action" href="operarios.html" hidden>Volver al menú</a>
+    <nav class="worker-menu" id="worker-menu" aria-label="Menú de operario">
+      <a class="worker-menu-card" id="open-checkin" href="operarios.html?view=scan" target="_blank" rel="noopener"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M8 8h3v3H8zm6 0h2v3h-2zm-6 6h3v2H8zm6 0h2v2h-2z"/></svg><strong>Escanear QR</strong><span>Escanea el QR físico de la base.</span></a>
+      <a class="worker-menu-card" id="open-history" href="operarios.html?view=history" target="_blank" rel="noopener"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 3 3 5-5"/></svg><strong>Mis asistencias</strong><span>Consulta tus fechas y horas de llegada.</span></a>
     </nav>
     <section class="worker-panel" id="checkin-panel" hidden aria-labelledby="checkin-title">
-      <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Registrar asistencia</h2>
-      <p>Escanea el QR colocado en la base. La hora se registra automáticamente.</p>
+      <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Escanear QR</h2>
+      <ol class="scan-steps" aria-label="Pasos para registrar"><li id="scan-step-camera" aria-current="step">1. Abre la cámara</li><li id="scan-step-code">2. Apunta al QR</li><li id="scan-step-confirm">3. Confirma tu llegada</li></ol>
+      <p>Coloca el QR de la base dentro de la cámara. Al reconocerlo, podrás confirmar tu asistencia.</p>
       <video id="qr-video" playsinline muted hidden></video>
       <button class="primary-button" id="start-camera" type="button">Abrir cámara</button>
       <button class="secondary-action" id="stop-camera" type="button" hidden>Cerrar cámara</button>
       <button class="primary-button" id="confirm-checkin" type="button" hidden>Confirmar mi asistencia</button>
-      <p id="checkin-message" role="status" aria-live="polite"></p>
+      <p id="checkin-message" class="scan-status" role="status" aria-live="polite"></p>
+      <a id="checkin-history-link" class="secondary-action" href="operarios.html?view=history" hidden>Ver mi asistencia registrada</a>
       <p class="worker-help">También puedes escanear el QR con la cámara de tu teléfono y abrir el enlace.</p>
     </section>
-    <section class="worker-panel" id="history-panel" hidden aria-labelledby="worker-history-title"><h2 id="worker-history-title">Mis asistencias</h2><p id="worker-history-message" role="status"></p><div id="worker-history"></div></section>
+    <section class="worker-panel" id="history-panel" hidden aria-labelledby="worker-history-title">
+      <p class="section-kicker">Tu historial personal</p><h2 id="worker-history-title">Mis asistencias</h2>
+      <p>Consulta cuándo llegaste y a qué hora. Las más recientes aparecen primero.</p>
+      <div class="history-tools"><div><label for="worker-month">Filtrar por mes</label><input id="worker-month" type="month"></div><button class="secondary-action" id="history-all" type="button">Ver todas</button><button class="secondary-action" id="history-refresh" type="button">Actualizar</button></div>
+      <div class="history-summary-cards"><div><strong id="history-total">—</strong><span>Asistencias en pantalla</span></div><div><strong id="history-latest">—</strong><span>Última llegada</span></div></div>
+      <p id="worker-history-message" role="status" aria-live="polite"></p><div id="worker-history"></div>
+    </section>
   </main>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=qr-1"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=qr-1"></script>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=worker-2"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=worker-2"></script>
 </body>
 </html>

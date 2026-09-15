@@ -14,6 +14,27 @@
 .worker-menu { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
 .worker-menu-card, .worker-panel { padding: 28px; border: 1px solid #fff; border-radius: 24px; background: rgba(255,255,255,.7); box-shadow: 0 14px 40px #102f4910; }
 .worker-menu-card { display: grid; gap: 12px; color: #008c95; text-align: left; transition: transform .2s; }
+.worker-menu-card { text-decoration: none; min-height: 190px; }
+.worker-menu-card:focus-visible, .secondary-action:focus-visible { outline: 3px solid #008c95; outline-offset: 4px; }
+.secondary-action { display: inline-block; text-decoration: none; }
+.scan-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0; list-style: none; margin: 24px 0; }
+.scan-steps li { padding: 12px; border-radius: 12px; background: #eef4f6; color: #627d8d; font-size: .85rem; }
+.scan-steps [aria-current="step"] { background: #dbf3f1; color: #006b73; font-weight: 700; box-shadow: inset 0 0 0 1px #9cd7d6; }
+.scan-status { padding: 16px; border-radius: 12px; background: #eef6f8; color: #102f49; }
+.scan-status:empty { display: none; }
+.scan-status.is-success { background: #dff5ed; color: #155a43; font-weight: 700; }
+.history-tools { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 24px 0; }
+.history-tools label { margin: 0 0 8px; }
+.history-tools input { min-height: 44px; padding: 8px 12px; border: 1px solid #bfdde0; border-radius: 10px; background: #fff; color: #102f49; font: inherit; }
+.history-summary-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.history-summary-cards > div { display: grid; gap: 8px; padding: 18px; border-radius: 14px; background: #eaf6f6; }
+.history-summary-cards strong { font-size: 1.3rem; color: #006b73; }
+.history-summary-cards span { font-size: .8rem; color: #627d8d; }
+.attendance-time { text-align: right; }
+.attendance-time strong { font-size: 1.3rem; }
+.attendance-time span { display: block; margin-top: 6px; font-size: .75rem; color: #176349; }
+.worker-attendance-row .attendance-weekday { text-transform: capitalize; margin: 0 0 6px; }
+@media (max-width: 400px) { .scan-steps { grid-template-columns: 1fr; } .history-summary-cards { grid-template-columns: 1fr; } }
 .worker-menu-card:hover { transform: translateY(-2px); }
 .worker-menu-card strong { color: #102f49; font-size: 1.2rem; }
 .worker-menu-card span { color: #627d8d; line-height: 1.5; }

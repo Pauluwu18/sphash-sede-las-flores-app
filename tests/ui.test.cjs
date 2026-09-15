@@ -26,7 +26,7 @@ function page(file, handler) {
 test('Admin usa la API autenticada, rechaza nombres libres y abre perfiles', async t=>{
   const calls=[];
   const people=[{id:'00000000-0000-0000-0000-000000000001',name:'Persona registrada',dni:'00000001',type:'Operario',active:true,has_pin:true}];
-  const dom=page('index.html',request=>{
+  const dom=page('admin.html',request=>{
     calls.push(request);
     switch(request.action){
       case 'status':return {ready:true};
@@ -91,7 +91,9 @@ test('Operario crea PIN y confirma QR sin registrar al abrir el enlace', async t
   assert.equal(calls.filter(c=>c.action==='checkin').length,1);
   assert.equal(calls.find(c=>c.action==='checkin').token,'worker-session');
   assert.match($('checkin-message').textContent,/correctamente/);
-  $('open-history').click();await flush();
+  assert.equal($('open-history').getAttribute('target'),'_blank');
+  assert.equal($('open-checkin').getAttribute('target'),'_blank');
+  $('history-refresh').click();await flush();
   assert.match($('worker-history').textContent,/15\/09\/2026/);
   assert.equal(w.location.hash,'');
 });
@@ -103,6 +105,67 @@ test('El lector solo acepta QR de la página y del sitio correctos',()=>{
   assert.equal(Splash.readQR(`https://other.example/operarios.html#base=${'a'.repeat(64)}`),'');
   assert.equal(Splash.readQR('javascript:alert(1)'),'');
   assert.equal(Splash.readQR('https://example.com/operarios.html#base=1234'),'');
+  dom.window.close();
+});
+
+test('La página de historial reutiliza sesión y filtra por mes', async t=>{
+  const calls=[];
+  const dom=page('operarios.html',request=>{
+    calls.push(request);
+    if(request.action==='me') return {name:'Operario'};
+    if(request.action==='my_attendance') return [
+      {date:'2026-09-15',time:'08:15',source:'QR'},
+      {date:'2026-08-10',time:'09:00',source:'Manual'}
+    ];
+  });
+  t.after(()=>dom.window.close());
+  dom.reconfigure({url:'https://example.com/operarios.html?view=history'});
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
+  assert.equal($('worker-login').hidden,true);
+  assert.equal($('worker-menu').hidden,true);
+  assert.equal($('history-panel').hidden,false);
+  assert.equal($('history-total').textContent,'2');
+  assert.equal(calls[0].token,'shared-session');
+  $('worker-month').value='2026-08';$('worker-month').dispatchEvent(new w.Event('change'));
+  assert.equal($('history-total').textContent,'1');
+  assert.match($('worker-history').textContent,/10\/08\/2026/);
+  assert.doesNotMatch($('worker-history').textContent,/15\/09\/2026/);
+  $('history-all').click();assert.equal($('history-total').textContent,'2');
+  w.dispatchEvent(new w.StorageEvent('storage',{key:'splash-worker-session',newValue:null}));
+  assert.equal($('worker-home').hidden,true);
+  assert.equal($('worker-history').children.length,0);
+});
+
+test('La página de escaneo abre cámara y permite reintentar si se deniega', async t=>{
+  const dom=page('operarios.html',()=>({name:'Operario'}));
+  t.after(()=>dom.window.close());
+  dom.reconfigure({url:'https://example.com/operarios.html?view=scan'});
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  let attempts=0;
+  Object.defineProperty(w.navigator,'mediaDevices',{value:{getUserMedia:async()=>{
+    attempts++;const error=new Error('Denied');error.name='NotAllowedError';throw error;
+  }}});
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
+  assert.equal(attempts,1);
+  assert.equal($('checkin-panel').hidden,false);
+  assert.equal($('worker-menu').hidden,true);
+  assert.match($('checkin-message').textContent,/Permite el acceso/);
+  assert.equal($('start-camera').disabled,false);
+  $('start-camera').click();await flush();assert.equal(attempts,2);
+});
+
+test('La entrada principal lleva al operario y conserva enlaces QR',()=>{
+  const html=fs.readFileSync('index.html','utf8');
+  let destination;
+  vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],{location:{search:'?view=scan',hash:'#base=abc',replace:value=>{destination=value;}}});
+  assert.equal(destination,'operarios.html?view=scan#base=abc');
+  const dom=page('operarios.html',()=>({}));
+  const link=dom.window.document.querySelector('.portal-link');
+  assert.equal(link.getAttribute('href'),'admin.html');
+  assert.equal(link.textContent,'Entrar como administrador');
   dom.window.close();
 });
 

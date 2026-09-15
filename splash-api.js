@@ -4,7 +4,7 @@ window.Splash = {
     const response = await fetch(`${this.url}/rest/v1/rpc/splash_api`, {
       method: 'POST',
       headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, payload, token: sessionStorage.getItem(`splash-${role}-session`) || '' })
+      body: JSON.stringify({ action, payload, token: (role === 'worker' ? localStorage : sessionStorage).getItem(`splash-${role}-session`) || '' })
     });
     const data = await response.json();
     if (!response.ok || data?.error) {
@@ -12,6 +12,7 @@ window.Splash = {
       error.code = data?.code;
       if (error.code === 'SESSION') {
         sessionStorage.removeItem(`splash-${role}-session`);
+        if (role === 'worker') localStorage.removeItem('splash-worker-session');
         window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: role }));
       }
       throw error;
