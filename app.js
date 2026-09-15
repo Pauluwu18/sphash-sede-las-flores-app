@@ -521,6 +521,7 @@ function closeNavigation() {
   navigationDrawer.setAttribute("aria-hidden", "true");
   menuToggle.setAttribute("aria-expanded", "false");
   navigationBackdrop.hidden = true;
+  if (navigationDrawer.contains(document.activeElement)) menuToggle.focus();
 }
 
 menuToggle.addEventListener("click", () => {
@@ -528,6 +529,7 @@ menuToggle.addEventListener("click", () => {
   navigationDrawer.setAttribute("aria-hidden", String(!open));
   menuToggle.setAttribute("aria-expanded", String(open));
   navigationBackdrop.hidden = !open;
+  if (open) navigationClose.focus();
 });
 
 navigationClose.addEventListener("click", closeNavigation);
