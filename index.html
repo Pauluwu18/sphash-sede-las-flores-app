@@ -14,14 +14,16 @@
 <body>
   <div class="login-screen" id="login-screen">
     <form class="login-card" id="login-form" autocomplete="off">
-      <div class="login-mark" aria-hidden="true">OL</div>
-      <p class="eyebrow">Acceso privado</p>
+      <div class="login-mark" aria-hidden="true"><span>OL</span></div>
+      <p class="login-kicker">Acceso privado</p>
       <h1>SPLASH SEDE LAS FLORES</h1>
       <p class="login-subtitle">Ingresa tus datos para continuar.</p>
-      <label for="login-user">Usuario</label>
-      <input id="login-user" type="text" autocomplete="username" required>
-      <label for="login-password">Contraseña</label>
-      <input id="login-password" type="password" autocomplete="current-password" required>
+      <label class="login-field" for="login-user"><span aria-hidden="true">&#128100;</span><b>Usuario</b>
+        <input id="login-user" type="text" placeholder="Tu usuario" autocomplete="username" required>
+      </label>
+      <label class="login-field" for="login-password"><span aria-hidden="true">&#128274;</span><b>Contraseña</b>
+        <input id="login-password" type="password" placeholder="Tu contraseña" autocomplete="current-password" required>
+      </label>
       <button class="login-button" type="submit">Iniciar sesión</button>
       <p class="login-message" id="login-message" role="alert" aria-live="polite"></p>
     </form>
