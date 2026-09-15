@@ -67,6 +67,15 @@ const loginForm = document.querySelector("#login-form");
 const loginMessage = document.querySelector("#login-message");
 const welcomeMessage = document.querySelector("#welcome-message");
 
+const passwordToggle = document.querySelector("#password-toggle");
+const loginPassword = document.querySelector("#login-password");
+passwordToggle.addEventListener("click", () => {
+  const visible = loginPassword.type === "password";
+  loginPassword.type = visible ? "text" : "password";
+  passwordToggle.setAttribute("aria-pressed", String(visible));
+  passwordToggle.setAttribute("aria-label", visible ? "Ocultar contraseña" : "Mostrar contraseña");
+});
+
 loginForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const username = document.querySelector("#login-user").value.trim();
