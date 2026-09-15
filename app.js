@@ -402,9 +402,10 @@ input.addEventListener("blur", () => {
   isInputFocused = false;
   window.setTimeout(() => { personNameSuggestions.hidden = true; }, 120);
 });
-personNameSuggestions.addEventListener("click", (event) => {
+personNameSuggestions.addEventListener("pointerdown", (event) => {
   const suggestion = event.target.closest("[data-suggestion-name]");
   if (!suggestion) return;
+  event.preventDefault();
   input.value = suggestion.dataset.suggestionName;
   personNameSuggestions.hidden = true;
   input.focus();
