@@ -292,6 +292,7 @@
     $('worker-login-message').textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stopCamera(); });
+  window.addEventListener('splash-native-pause', stopCamera);
   window.addEventListener('pagehide', stopCamera);
   window.addEventListener('hashchange', () => {
     const candidate = Splash.readQR(location.href);
