@@ -1,0 +1,2 @@
+[functions.splash-admin-push]
+verify_jwt = false

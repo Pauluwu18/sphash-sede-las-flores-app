@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.SplashAdmin" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#102A43</item>
+        <item name="android:navigationBarColor">#102A43</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">#008C95</item>
+    </style>
+</resources>

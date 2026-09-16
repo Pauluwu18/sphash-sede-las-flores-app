@@ -3,3 +3,5 @@ registros.db
 __pycache__/
 *.log
 node_modules/
+*service-account*.json
+firebase-adminsdk*.json
