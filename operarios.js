@@ -6,6 +6,34 @@
   let frame = null;
   let scanGeneration = 0;
   let saving = false;
+  let bellContext;
+  function prepareBell() {
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      bellContext ||= new Audio();
+      if (bellContext.state === 'suspended') bellContext.resume().catch(() => {});
+    } catch { /* El registro funciona aunque el dispositivo bloquee el audio. */ }
+  }
+  document.addEventListener('pointerdown', prepareBell);
+  document.addEventListener('keydown', prepareBell);
+  function ringBell() {
+    if (bellContext?.state !== 'running') return;
+    try {
+      const start = bellContext.currentTime;
+      for (const [frequency, volume] of [[880, .16], [1760, .055], [2640, .025]]) {
+        const tone = bellContext.createOscillator();
+        const gain = bellContext.createGain();
+        tone.frequency.value = frequency;
+        gain.gain.setValueAtTime(.001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + .015);
+        gain.gain.exponentialRampToValueAtTime(.001, start + 1.1);
+        tone.connect(gain); gain.connect(bellContext.destination);
+        tone.start(start); tone.stop(start + 1.15);
+        tone.onended = () => { tone.disconnect(); gain.disconnect(); };
+      }
+    } catch { /* El sonido nunca debe interrumpir la confirmación visual. */ }
+  }
   let cameraTimer;
   const view = new URLSearchParams(location.search).get('view');
   let historyRecords = [];
@@ -58,13 +86,13 @@
   function showCheckin() {
     $('checkin-panel').hidden = false;
     $('history-panel').hidden = true;
-    $('confirm-checkin').hidden = !qrToken;
+    $('confirm-checkin').hidden = true;
     $('start-camera').hidden = !!qrToken;
-    $('checkin-message').textContent = qrToken ? 'QR reconocido. Confirma para registrar tu llegada.' : '';
+    $('checkin-message').textContent = qrToken ? 'QR reconocido. Registrando tu asistencia…' : '';
     $('checkin-message').classList.remove('is-success');
     $('checkin-history-link').hidden = true;
     setStep(qrToken ? 'confirm' : 'camera');
-    if (qrToken) scannerState('ready', 'QR reconocido', 'Listo para confirmar');
+    if (qrToken) { scannerState('ready', 'QR reconocido', 'Registrando'); registerCheckin(); }
   }
 
   function setStep(step) {
@@ -259,22 +287,38 @@
       $('scanner-link-message').textContent = 'Mantén pulsado el enlace para copiarlo y abrirlo en tu navegador.';
     }
   });
-  $('confirm-checkin').addEventListener('click', async () => {
+  async function registerCheckin() {
     if (saving || !qrToken) return;
     saving = true;
+    stopCamera();
+    $('qr-photo').disabled = true;
+    $('checkin-message').textContent = 'Registrando tu asistencia…';
     $('confirm-checkin').disabled = true;
+    $('confirm-checkin').hidden = true;
     try {
       const result = await Splash.call('checkin', { qr: qrToken }, 'worker');
+      if (!result?.ok && !result?.already) throw new Error('El servidor no confirmó el registro.');
+      qrToken = '';
+      if ($('worker-home').hidden) return;
       $('checkin-message').textContent = result.message;
       $('checkin-message').classList.add('is-success');
       $('checkin-history-link').hidden = false;
       scannerState('success', result.already ? 'Ya registraste tu llegada' : 'Asistencia registrada', 'Registro confirmado');
-      qrToken = '';
       $('confirm-checkin').hidden = true;
       $('start-camera').hidden = true;
-    } catch (error) { $('checkin-message').textContent = `${error.message} No se ha confirmado la asistencia.`; }
-    finally { saving = false; $('confirm-checkin').disabled = false; }
-  });
+      $('attendance-result-title').textContent = result.already ? 'Ya registrada' : 'Registrado';
+      $('attendance-result-message').textContent = result.already ? 'Tu asistencia de hoy ya estaba registrada. No se creó un duplicado.' : 'Tu llegada se guardó correctamente. Ya puedes continuar.';
+      if (!$('attendance-result').open) $('attendance-result').showModal();
+      if (!result.already) ringBell();
+    } catch (error) {
+      $('checkin-message').textContent = `${error.message} No se ha confirmado la asistencia. Puedes reintentar sin duplicarla.`;
+      $('confirm-checkin').hidden = false;
+      scannerState('error', 'No se confirmó el registro', 'Reintenta');
+    }
+    finally { saving = false; $('confirm-checkin').disabled = false; $('qr-photo').disabled = false; }
+  }
+  $('confirm-checkin').addEventListener('click', registerCheckin);
+  $('attendance-result-close').addEventListener('click', () => $('attendance-result').close());
 
   async function logout() {
     stopCamera();

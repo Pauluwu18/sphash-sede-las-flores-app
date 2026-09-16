@@ -61,7 +61,7 @@ test('Admin usa la API autenticada, rechaza nombres libres y abre perfiles', asy
   $('profile-close').click();assert.equal($('profile-pin').textContent,'');
 });
 
-test('Operario crea PIN y confirma QR sin registrar al abrir el enlace', async t=>{
+test('Operario crea PIN y registra el QR al terminar el acceso', async t=>{
   const calls=[];
   const dom=page('operarios.html',request=>{
     calls.push(request);
@@ -86,8 +86,8 @@ test('Operario crea PIN y confirma QR sin registrar al abrir el enlace', async t
   $('worker-pin-confirm').value='0123';
   $('worker-login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
   assert.equal($('worker-home').hidden,false);
-  assert.equal(calls.filter(c=>c.action==='checkin').length,0);
-  $('confirm-checkin').click();await flush();
+  assert.equal($('attendance-result').open,true);
+  assert.equal($('attendance-result-title').textContent,'Registrado');
   assert.equal(calls.filter(c=>c.action==='checkin').length,1);
   assert.equal(calls.find(c=>c.action==='checkin').token,'worker-session');
   assert.match($('checkin-message').textContent,/correctamente/);
@@ -211,9 +211,9 @@ test('Una cámara sin respuesta permite reintentar y libera permisos tardíos', 
   assert.equal($('qr-video').hidden,true);
 });
 
-test('Una foto QR válida habilita confirmar sin registrar automáticamente', async t=>{
+test('Una foto QR válida registra automáticamente', async t=>{
   const calls=[];
-  const dom=page('operarios.html',request=>{calls.push(request);return {name:'Operario'};});
+  const dom=page('operarios.html',request=>{calls.push(request);return request.action==='checkin' ? {ok:true,message:'Registrado'} : {name:'Operario'};});
   t.after(()=>dom.window.close());
   dom.reconfigure({url:'https://example.com/operarios.html?view=scan'});
   const w=dom.window,$=id=>w.document.getElementById(id);
@@ -225,9 +225,45 @@ test('Una foto QR válida habilita confirmar sin registrar automáticamente', as
   w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
   Object.defineProperty($('qr-photo'),'files',{value:[new w.File(['test'],'qr.png',{type:'image/png'})]});
   $('qr-photo').dispatchEvent(new w.Event('change'));await flush();
+  assert.equal($('confirm-checkin').hidden,true);
+  assert.equal($('attendance-result').open,true);
+  assert.equal(calls.filter(call=>call.action==='checkin').length,1);
+});
+
+test('El aviso y la campana esperan al servidor; el error permite reintentar', async t=>{
+  let finish, attempts=0, sounds=0;
+  const dom=page('operarios.html',request=>{
+    if(request.action==='me') return {name:'Operario'};
+    if(request.action==='checkin') { attempts++; return new Promise(resolve=>{finish=resolve;}); }
+  });
+  t.after(()=>dom.window.close());
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.AudioContext=class {
+    state='running';currentTime=0;destination={};
+    createOscillator(){return {frequency:{},connect(){},disconnect(){},start(){sounds++;},stop(){}};}
+    createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}
+  };
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.location.hash=`base=${'a'.repeat(64)}`;
+  w.eval(fs.readFileSync('operarios.js','utf8'));
+  w.document.dispatchEvent(new w.Event('pointerdown'));await flush();
+  assert.equal(attempts,1);assert.equal(sounds,0);assert.equal($('attendance-result').open,false);
+  finish({error:'Sin conexión'});await flush();
+  assert.equal($('attendance-result').open,false);assert.equal(sounds,0);
   assert.equal($('confirm-checkin').hidden,false);
-  assert.equal($('scanner-viewport').dataset.state,'ready');
-  assert.equal(calls.filter(call=>call.action==='checkin').length,0);
+  $('confirm-checkin').click();await flush();finish({ok:true,message:'Guardado'});await flush();
+  assert.equal(attempts,2);assert.equal($('attendance-result').open,true);assert.equal(sounds,3);
+});
+
+test('Una asistencia repetida muestra un aviso distinto sin registrarla otra vez', async t=>{
+  const dom=page('operarios.html',request=>request.action==='me'?{name:'Operario'}:{already:true,message:'Ya registrada'});
+  t.after(()=>dom.window.close());
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.localStorage.setItem('splash-worker-session','shared-session');
+  w.location.hash=`base=${'a'.repeat(64)}`;
+  w.eval(fs.readFileSync('operarios.js','utf8'));await flush();
+  assert.equal($('attendance-result-title').textContent,'Ya registrada');
+  assert.equal($('attendance-result').open,true);
 });
 
 test('El QR generado puede decodificarse con el lector incluido',()=>{

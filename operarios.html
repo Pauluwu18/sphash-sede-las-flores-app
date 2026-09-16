@@ -6,7 +6,7 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=scanner-5"><link rel="stylesheet" href="qr-attendance.css?v=scanner-5">
+  <link rel="stylesheet" href="styles.css?v=auto-checkin-6"><link rel="stylesheet" href="qr-attendance.css?v=auto-checkin-6">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -35,8 +35,8 @@
     </nav>
     <section class="worker-panel" id="checkin-panel" hidden aria-labelledby="checkin-title">
       <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Escanear QR</h2>
-      <ol class="scan-steps" aria-label="Pasos para registrar"><li id="scan-step-camera" aria-current="step">1. Abre la cámara</li><li id="scan-step-code">2. Apunta al QR</li><li id="scan-step-confirm">3. Confirma tu llegada</li></ol>
-      <p class="scanner-intro">Acerca el teléfono al QR de la base y encuádralo. Tu asistencia se guarda al confirmar.</p>
+      <ol class="scan-steps" aria-label="Pasos para registrar"><li id="scan-step-camera" aria-current="step">1. Abre la cámara</li><li id="scan-step-code">2. Apunta al QR</li><li id="scan-step-confirm">3. Registro automático</li></ol>
+      <p class="scanner-intro">Encuadra el QR de la base. Tu asistencia se registra automáticamente: espera el aviso «Registrado».</p>
       <div class="scanner-viewport" id="scanner-viewport" data-state="idle">
         <video id="qr-video" playsinline muted hidden></video>
         <div class="scanner-placeholder" id="scanner-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 5l2-2h4l2 2h4v15H4V5z"/><circle cx="12" cy="12" r="4"/></svg><strong id="scanner-caption">Tu cámara aparecerá aquí</strong><span>Usa buena luz y mantén el teléfono quieto.</span></div>
@@ -45,7 +45,7 @@
       </div>
       <button class="primary-button" id="start-camera" type="button">Abrir cámara</button>
       <button class="secondary-action" id="stop-camera" type="button" hidden>Cerrar cámara</button>
-      <button class="primary-button" id="confirm-checkin" type="button" hidden>Confirmar mi asistencia</button>
+      <button class="primary-button" id="confirm-checkin" type="button" hidden>Reintentar registro</button>
       <p id="checkin-message" class="scan-status" role="status" aria-live="polite"></p>
       <a id="checkin-history-link" class="secondary-action" href="operarios.html?view=history" hidden>Ver mi asistencia registrada</a>
       <div class="scanner-alternatives"><label class="secondary-action photo-qr-button" for="qr-photo">Tomar foto del QR</label><input id="qr-photo" type="file" accept="image/*" capture="environment" class="visually-hidden"><p class="worker-help">Si no abre la cámara en vivo, toma una foto nítida del QR. La imagen se procesa en tu teléfono.</p></div>
@@ -59,6 +59,12 @@
       <p id="worker-history-message" role="status" aria-live="polite"></p><div id="worker-history"></div>
     </section>
   </main>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=scanner-5"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=scanner-5"></script>
+  <dialog class="attendance-result" id="attendance-result" aria-labelledby="attendance-result-title" aria-describedby="attendance-result-message">
+    <div class="attendance-result-icon" aria-hidden="true"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4 4L19 6"/></svg></div>
+    <h2 id="attendance-result-title">Registrado</h2>
+    <p id="attendance-result-message"></p>
+    <button class="primary-button" id="attendance-result-close" type="button" autofocus>Entendido</button>
+  </dialog>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=auto-checkin-6"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=auto-checkin-6"></script>
 </body>
 </html>
