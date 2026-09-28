@@ -61,7 +61,7 @@ test('Admin usa la API autenticada, rechaza nombres libres y abre perfiles', asy
   $('profile-close').click();assert.equal($('profile-pin').textContent,'');
 });
 
-test('Operario crea PIN y registra el QR al terminar el acceso', async t=>{
+test('Operario crea su PIN inicial desde la APK sin escanear QR', async t=>{
   const calls=[];
   const dom=page('operarios.html',request=>{
     calls.push(request);
@@ -75,7 +75,6 @@ test('Operario crea PIN y registra el QR al terminar el acceso', async t=>{
   });
   t.after(()=>dom.window.close());
   const w=dom.window,$=id=>w.document.getElementById(id);
-  w.location.hash=`base=${'a'.repeat(64)}`;
   w.eval(fs.readFileSync('operarios.js','utf8'));
   $('worker-dni').value='00000001';
   $('worker-login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
@@ -86,16 +85,10 @@ test('Operario crea PIN y registra el QR al terminar el acceso', async t=>{
   $('worker-pin-confirm').value='0123';
   $('worker-login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
   assert.equal($('worker-home').hidden,false);
-  assert.equal($('attendance-result').open,true);
-  assert.equal($('attendance-result-title').textContent,'Registrado');
-  assert.equal(calls.filter(c=>c.action==='checkin').length,1);
-  assert.equal(calls.find(c=>c.action==='checkin').token,'worker-session');
-  assert.match($('checkin-message').textContent,/correctamente/);
+  assert.equal(calls.filter(c=>c.action==='activate')[0].payload.qr,undefined);
+  assert.equal(calls.filter(c=>c.action==='checkin').length,0);
   assert.equal($('open-history').tagName,'BUTTON');
   assert.equal($('open-checkin').tagName,'BUTTON');
-  $('history-refresh').click();await flush();
-  assert.match($('worker-history').textContent,/15\/09\/2026/);
-  assert.match($('worker-history').textContent,/Tardanza/);
   assert.equal(w.location.hash,'');
 });
 

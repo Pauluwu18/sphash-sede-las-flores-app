@@ -13,6 +13,7 @@ test('Migración y flujos de asistencia sobre PostgreSQL aislado', async t => {
   await db.exec(fs.readFileSync('supabase-schema.sql','utf8'));
   const migration = fs.readFileSync('migrations/20260915_qr_attendance.sql','utf8');
   await db.exec(migration);
+  await db.exec(fs.readFileSync('migrations/20260928_worker_activation_without_qr.sql','utf8'));
   const initial = (await db.query('select password from splash_initial_access')).rows[0].password;
   async function api(action, payload={}, token='') {
     return (await db.query('select public.splash_api($1,$2::jsonb,$3) result',[action,JSON.stringify(payload),token])).rows[0].result;
@@ -39,8 +40,7 @@ test('Migración y flujos de asistencia sobre PostgreSQL aislado', async t => {
     assert.ok(personId);
     assert.ok((await api('save_person',{name:'Otro operario',dni:'00000001'},admin.token)).error);
     assert.ok((await api('worker_login',{dni:'00000001'})).needs_pin);
-    assert.ok((await api('activate',{dni:'00000001',pin:'0123',qr:'incorrecto'})).error);
-    worker = await api('activate',{dni:'00000001',pin:'0123',qr});
+    worker = await api('activate',{dni:'00000001',pin:'0123'});
     assert.ok(worker.token);
     assert.ok((await api('activate',{dni:'00000001',pin:'9999',qr})).error);
     assert.equal((await api('person_pin',{id:personId},admin.token)).pin,'0123');

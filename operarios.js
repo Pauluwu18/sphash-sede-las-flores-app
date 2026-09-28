@@ -143,9 +143,8 @@
       const dni = $('worker-dni').value.trim();
       const pin = $('worker-pin').value;
       if (activating && (pin !== $('worker-pin-confirm').value || !/^\d{4}$/.test(pin))) throw new Error('Escribe el mismo PIN de 4 dígitos en ambos campos.');
-      const result = await Splash.call(activating ? 'activate' : 'worker_login', { dni, pin, qr: qrToken }, 'worker');
+      const result = await Splash.call(activating ? 'activate' : 'worker_login', { dni, pin, ...(qrToken && { qr: qrToken }) }, 'worker');
       if (result.needs_pin) {
-        if (!qrToken) throw new Error('Tu cuenta está lista. Escanea el QR físico de la base con la cámara de tu teléfono para crear tu PIN.');
         activating = true;
         $('pin-confirm-wrap').hidden = false;
         $('worker-pin').required = true;
