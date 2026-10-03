@@ -67,17 +67,26 @@ Deno.serve(async (request) => {
 
     const bearer = await accessToken(JSON.parse(accountJson));
     const results = await Promise.all(event.tokens.map(async (token: string) => {
+      const voice = Array.isArray(event.voice_tokens) && event.voice_tokens.includes(token);
+      const message = voice ? {
+        token,
+        data: {
+          kind: "attendance_voice", name: String(event.name || "Un operario"),
+          time: String(event.time), event_id: String(event.event_id),
+        },
+        android: { priority: "high", ttl: "60s" },
+      } : {
+        token,
+        notification: {
+          title: "Nueva asistencia QR",
+          body: `Se registró una asistencia a las ${event.time}. Abre administración para verla.`,
+        },
+        android: { priority: "high", notification: { channel_id: "attendance", default_sound: true } },
+      };
       const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(firebaseProject)}/messages:send`, {
         method: "POST",
         headers: { ...jsonHeaders, Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ message: {
-          token,
-          notification: {
-            title: "Nueva asistencia QR",
-            body: `Se registró una asistencia a las ${event.time}. Abre administración para verla.`,
-          },
-          android: { priority: "high", notification: { channel_id: "attendance" } },
-        } }),
+        body: JSON.stringify({ message }),
       });
       return response.ok;
     }));

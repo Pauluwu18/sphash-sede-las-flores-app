@@ -122,10 +122,12 @@ window.AdminQR = {
   });
   $('admin-logout').addEventListener('click', async () => {
     try { if (qrEnabled) await Splash.call('logout'); } catch { /* Siempre cerrar la sesión local. */ }
+    localStorage.removeItem('splash-admin-persist');
     sessionStorage.removeItem('splash-admin-session'); location.reload();
   });
   window.addEventListener('splash-session-expired', event => {
     if (event.detail !== 'admin') return;
+    localStorage.removeItem('splash-admin-persist');
     document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
     loginScreen.hidden = false; loginMessage.textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
   });

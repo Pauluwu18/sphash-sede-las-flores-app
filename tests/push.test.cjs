@@ -56,6 +56,27 @@ test('solo sesiones admin reciben avisos por cada registro QR nuevo', async t =>
   assert.deepEqual(event.tokens, [device]);
   assert.match(event.time, /^\d{2}:\d{2}$/);
 
+  await db.exec(fs.readFileSync('migrations/20260928_admin_voice.sql','utf8'));
+  await db.exec(fs.readFileSync('migrations/20260928_admin_voice.sql','utf8'));
+  const voiceRegister = async session => (await db.query(
+    "select public.splash_push_registration_voice('register',$1,$2) result",
+    [session, device])).rows[0].result;
+  const voiceEvent = async () => (await db.query(
+    'select public.splash_push_event($1,$2::date) result',
+    [personId, requests[0].body.work_date])).rows[0].result;
+  assert.deepEqual((await voiceEvent()).voice_tokens, [], 'APK antigua mantiene aviso normal');
+  assert.equal((await voiceRegister(worker.token)).code, 'SESSION');
+  assert.deepEqual((await voiceEvent()).voice_tokens, []);
+  assert.equal((await voiceRegister(admin.token)).ok, true);
+  const spoken = await voiceEvent();
+  assert.deepEqual(spoken.voice_tokens, [device]);
+  assert.equal(spoken.name, 'Operario aviso');
+  assert.equal(spoken.event_id, personId + ':' + requests[0].body.work_date);
+  await db.exec('set role anon');
+  await assert.rejects(db.query('select public.splash_push_event($1,$2::date)',
+    [personId, requests[0].body.work_date]), /permission denied/);
+  await db.exec('reset role');
+
   await api('logout', {}, admin.token);
   assert.equal((await db.query('select count(*)::int n from splash_private.admin_push_devices')).rows[0].n, 0);
 });

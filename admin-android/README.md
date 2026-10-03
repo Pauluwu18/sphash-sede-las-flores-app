@@ -23,4 +23,53 @@ El disparador escucha solo nuevas asistencias con origen `QR`; no envía avisos 
 
 ## Prueba en teléfono físico
 
+### Lectura en voz alta (versión 1.2)
+
+La APK administrativa lee el nombre real y la hora de Lima: «Adriano se registró
+a las 7 horas y 30 minutos». Actualizar la APK, abrirla e iniciar sesión de
+administrador para registrar la capacidad de voz del teléfono. Los operarios
+no reciben estos avisos. El texto visible sigue siendo genérico; el nombre se
+envía al dispositivo administrativo para la lectura, incluso con pantalla bloqueada.
+
+Requiere un motor de texto a voz con español instalado en Android. Respeta el
+volumen de notificaciones, el canal Asistencias QR, silencio y No molestar.
+Si el motor no admite español o Android impide iniciar la reproducción, permanece
+el aviso visual. Un servicio breve mantiene la lectura en segundo plano y muestra
+«Detener lectura»; se cierra al terminar o, como máximo, a los 30 segundos.
+Las llegadas se leen en cola y se descartan repeticiones recientes. Los mensajes
+de voz caducan a los 60 segundos para evitar leer asistencias antiguas al reconectar.
+
+Aplicar `migrations/20260928_admin_voice.sql` después de la migración push y
+publicar la Edge Function actualizada. La nueva APK registra el teléfono con
+`splash_push_registration_voice`; las APK anteriores conservan el aviso FCM
+habitual, sin TTS. El nombre y los tokens solo se consultan mediante la función
+de servidor con rol de servicio. Las sesiones de administrador siguen venciendo
+a las 12 horas.
+
+Comprobado: compilación APK y pruebas automatizadas de permisos, migración
+repetible y mensajes FCM de versiones antiguas/nuevas. Pendiente de dispositivo
+físico: voz española, pantalla bloqueada, varias llegadas, silencio y motor TTS
+ausente. La migración y el envío se activaron en Supabase durante esta actualización.
+
+### Sonido de los avisos (versión 1.1)
+
+El envío FCM solicita `default_sound: true`; la APK define el tono predeterminado
+de notificación al crear el canal `attendance` y lo solicita explícitamente en
+Android 7 cuando está abierta. En Android 8 o superior, el sistema conserva los
+ajustes de sonido del canal existente al actualizar la app. Si está silenciado,
+la APK ofrece abrir sus ajustes después del acceso de administrador.
+
+Para activarlo en una instalación existente: Ajustes de Android → Aplicaciones →
+SPLASH Administración → Notificaciones → Asistencias QR → Sonido. Elegir un tono
+y permitir alertas. Comprobar también el volumen de notificaciones y No molestar.
+No se borran ni recrean canales para sobrescribir las preferencias del teléfono.
+
+Referencias: [canales de Android](https://developer.android.com/develop/ui/compose/notifications/channels)
+y [sonido en FCM HTTP v1](https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages).
+
+Validación local del cambio: `:app:assembleDebug` genera la APK. `:app:lintDebug`
+detecta el error preexistente `GestureBackNavigation` en `onBackPressed` y cinco
+advertencias; queda pendiente probar sonido con un teléfono físico, tanto con
+la APK abierta como cerrada.
+
 Instala la app administradora en un teléfono con Google Play Services, inicia sesión y concede las notificaciones. En otro teléfono, registra una asistencia QR real de un operario. Comprueba que llega **Nueva asistencia QR** con la app administradora abierta, en segundo plano y con pantalla bloqueada. Abre el aviso y confirma el registro en administración. Después cierra sesión y repite: no debe llegar otro aviso a ese dispositivo. Prueba también denegar el permiso de notificaciones y una sesión vencida. El emulador sin Google Play Services no sirve para validar entrega FCM real.

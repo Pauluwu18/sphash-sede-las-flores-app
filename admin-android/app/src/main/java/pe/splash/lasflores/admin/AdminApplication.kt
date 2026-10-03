@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.Notification
 import android.content.Context
 import android.os.Build
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 
@@ -18,6 +20,13 @@ class AdminApplication : Application() {
             ).apply {
                 description = "Avisos de nuevas asistencias de operarios"
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
             }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)

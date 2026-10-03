@@ -1,7 +1,9 @@
-package pe.splash.lasflores.admin
+﻿package pe.splash.lasflores.admin
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -15,6 +17,7 @@ import android.os.Looper
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Base64
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -39,6 +42,7 @@ class MainActivity : Activity() {
     private var registering = false
     private var registrationNonce: String? = null
     private var notificationPermissionRequested = false
+    private var soundSettingsExplained = false
     private val notificationPermissionCode = 10
     private val poll = object : Runnable {
         override fun run() {
@@ -120,7 +124,10 @@ class MainActivity : Activity() {
     private fun checkAdminSession() {
         if (!resumed || registeredForPage || registering || !isSitePage(Uri.parse(webView.url ?: ""))) return
         if (FirebaseApp.getApps(this).isEmpty()) return
-        webView.evaluateJavascript("!!sessionStorage.getItem('splash-admin-session')") { hasSession ->
+        // Verifica sessionStorage y tambien localStorage (para "Mantener sesion").
+        webView.evaluateJavascript(
+            "(!!sessionStorage.getItem('splash-admin-session') || !!localStorage.getItem('splash-admin-persist'))"
+        ) { hasSession ->
             if (!resumed || hasSession != "true" || registeredForPage || registering) return@evaluateJavascript
             if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -131,6 +138,7 @@ class MainActivity : Activity() {
                 }
                 return@evaluateJavascript
             }
+            explainSilentChannel()
             registering = true
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                 if (!resumed || !task.isSuccessful || task.result.isNullOrBlank()) {
@@ -153,7 +161,7 @@ class MainActivity : Activity() {
               try {
                 const session=sessionStorage.getItem('splash-admin-session');
                 if(session && window.Splash){
-                  const response=await fetch(Splash.url+'/rest/v1/rpc/splash_push_registration',{
+                  const response=await fetch(Splash.url+'/rest/v1/rpc/splash_push_registration_voice',{
                     method:'POST',
                     headers:{apikey:Splash.key,Authorization:'Bearer '+Splash.key,'Content-Type':'application/json'},
                     body:JSON.stringify({action:'register',session_token:session,device_token:$tokenLiteral})
@@ -165,6 +173,28 @@ class MainActivity : Activity() {
               SplashAdminNative.registrationResult($nonceLiteral,success);
             })();""".trimIndent(), null
         )
+    }
+
+    private fun explainSilentChannel() {
+        if (Build.VERSION.SDK_INT < 26 || soundSettingsExplained) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = manager.getNotificationChannel("attendance") ?: return
+        if (manager.areNotificationsEnabled() &&
+            channel.importance >= NotificationManager.IMPORTANCE_DEFAULT &&
+            channel.sound != null
+        ) return
+        soundSettingsExplained = true
+        AlertDialog.Builder(this)
+            .setTitle("Activa el sonido de las asistencias")
+            .setMessage("Android tiene estos avisos bloqueados o en silencio. En los ajustes de Asistencias QR, permite las notificaciones y elige un sonido.")
+            .setPositiveButton("Abrir ajustes") { _, _ ->
+                startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    putExtra(Settings.EXTRA_CHANNEL_ID, "attendance")
+                })
+            }
+            .setNegativeButton("Ahora no", null)
+            .show()
     }
 
     private inner class SiteActions {

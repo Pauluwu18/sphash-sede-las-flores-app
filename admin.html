@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=menu-3">
-  <link rel="stylesheet" href="qr-attendance.css?v=menu-3">
+  <link rel="stylesheet" href="styles.css?v=session-1">
+  <link rel="stylesheet" href="qr-attendance.css?v=session-1">
 </head>
 <body>
   <div class="login-screen" id="login-screen">
@@ -33,6 +33,11 @@
           <button class="password-toggle" id="password-toggle" type="button" aria-label="Mostrar contraseña" aria-controls="login-password" aria-pressed="false"><svg aria-hidden="true" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m4 4 16 16"/></svg></button>
         </div>
       </div>
+      <label class="late-toggle keep-session-toggle" for="keep-session">
+        <input id="keep-session" type="checkbox">
+        <span class="toggle-ui" aria-hidden="true"></span>
+        <span>Mantener sesión iniciada</span>
+      </label>
       <button class="login-button" type="submit">Iniciar sesión</button>
       <p class="login-message" id="login-message" role="alert" aria-live="polite"></p>
       <a class="portal-link" href="operarios.html">Soy operario ? Acceder con DNI</a>
@@ -309,9 +314,9 @@
     <div class="qr-poster"><h3>SPLASH SEDE LAS FLORES</h3><div id="base-qr"></div><h3>Registra tu asistencia</h3><p>Escanea e ingresa con tu DNI y PIN.</p></div>
     <p id="qr-message" role="status"></p><div class="qr-actions"><button class="secondary-action" id="qr-print" disabled>Imprimir</button><button class="secondary-action" id="qr-download" disabled>Descargar imagen</button><button class="secondary-action" id="qr-rotate">Reemplazar QR</button></div>
   </dialog>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=menu-3"></script>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=session-1"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="app.js?v=menu-3"></script>
-  <script src="admin-qr.js?v=menu-3"></script>
+  <script src="app.js?v=session-1"></script>
+  <script src="admin-qr.js?v=session-1"></script>
 </body>
 </html>

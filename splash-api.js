@@ -1,10 +1,16 @@
 /* La clave pública se configura al final de este archivo; nunca usar service_role. */
 window.Splash = {
   async call(action, payload = {}, role = 'admin') {
+    let token = (role === 'worker' ? localStorage : sessionStorage).getItem(`splash-${role}-session`) || '';
+    // Para el rol admin, si sessionStorage está vacío, intentar con el token persistido.
+    if (role === 'admin' && !token) {
+      token = localStorage.getItem('splash-admin-persist') || '';
+      if (token) sessionStorage.setItem('splash-admin-session', token);
+    }
     const response = await fetch(`${this.url}/rest/v1/rpc/splash_api`, {
       method: 'POST',
       headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, payload, token: (role === 'worker' ? localStorage : sessionStorage).getItem(`splash-${role}-session`) || '' })
+      body: JSON.stringify({ action, payload, token })
     });
     const data = await response.json();
     if (!response.ok || data?.error) {
@@ -13,6 +19,7 @@ window.Splash = {
       if (error.code === 'SESSION') {
         sessionStorage.removeItem(`splash-${role}-session`);
         if (role === 'worker') localStorage.removeItem('splash-worker-session');
+        if (role === 'admin') localStorage.removeItem('splash-admin-persist');
         window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: role }));
       }
       throw error;
