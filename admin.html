@@ -158,6 +158,7 @@
           <pre id="report" aria-label="Reporte de asistencia"></pre>
         </div>
         <div class="report-actions">
+          <button class="secondary-action" id="download-current-excel" type="button">Descargar Excel del día</button>
           <button class="save-button" id="save-button" type="button"><span aria-hidden="true">&#10003;</span> Guardar</button>
           <button class="copy-button" id="copy-button" type="button">
             <span class="copy-icon" aria-hidden="true"></span> Copiar texto
@@ -211,6 +212,7 @@
     <button class="history-load-button" id="history-load-button" type="button"><span aria-hidden="true">&#8658;</span> Cargar en paso 2</button>
     <pre class="history-report" id="history-report"></pre>
     <div class="history-share-actions">
+      <button class="secondary-action" id="download-history-excel" type="button">Descargar Excel de esta fecha</button>
       <button class="whatsapp-button" id="share-history-button" type="button"><span aria-hidden="true">&#9742;</span> Compartir por WhatsApp</button>
       <button class="copy-button" id="copy-history-button" type="button"><span class="copy-icon" aria-hidden="true"></span> Copiar este registro</button>
     </div>
@@ -316,6 +318,8 @@
   </dialog>
   <script src="vendor/supabase.js"></script><script src="splash-api.js?v=session-1"></script>
   <script src="vendor/qrcode.min.js"></script>
+  <script src="vendor/exceljs.min.js"></script>
+  <script src="attendance-excel.js?v=20261003"></script>
   <script src="app.js?v=session-1"></script>
   <script src="admin-qr.js?v=session-1"></script>
 </body>

@@ -43,6 +43,9 @@ class MainActivity : Activity() {
     private var registrationNonce: String? = null
     private var notificationPermissionRequested = false
     private var soundSettingsExplained = false
+    private var pendingExcel: ByteArray? = null
+    private val excelRequestCode = 11
+    private val excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     private val notificationPermissionCode = 10
     private val poll = object : Runnable {
         override fun run() {
@@ -218,6 +221,25 @@ class MainActivity : Activity() {
             }
         }
 
+        @JavascriptInterface fun saveExcel(filename: String, dataUrl: String) {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                if (!filename.matches(Regex("Registro-Diario-\\d{4}-\\d{2}-\\d{2}\\.xlsx")) ||
+                    !dataUrl.startsWith("data:$excelMime;base64,") || dataUrl.length > 16_000_000) return@post
+                if (pendingExcel != null) { toast("Termina de guardar el archivo anterior."); return@post }
+                try {
+                    val bytes = Base64.decode(dataUrl.substringAfter(','), Base64.DEFAULT)
+                    if (bytes.size < 4 || bytes[0] != 80.toByte() || bytes[1] != 75.toByte()) return@post
+                    pendingExcel = bytes
+                    startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = excelMime
+                        putExtra(Intent.EXTRA_TITLE, filename)
+                    }, excelRequestCode)
+                } catch (_: Exception) { pendingExcel = null; toast("No se pudo preparar la descarga del Excel.") }
+            }
+        }
+
         @JavascriptInterface fun saveQrImage(dataUrl: String) {
             mainHandler.post { if (isSitePage(Uri.parse(webView.url ?: ""))) saveQr(dataUrl) }
         }
@@ -251,6 +273,20 @@ class MainActivity : Activity() {
     }
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+
+    @Deprecated("Uses the platform document picker")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != excelRequestCode) return
+        val bytes = pendingExcel
+        pendingExcel = null
+        if (resultCode != RESULT_OK || data?.data == null || bytes == null) return
+        try {
+            contentResolver.openOutputStream(data.data!!)?.use { it.write(bytes) }
+                ?: throw IllegalStateException("No se pudo abrir el archivo")
+            toast("Excel guardado correctamente.")
+        } catch (_: Exception) { toast("No se pudo guardar el Excel. Vuelve a descargarlo.") }
+    }
 
     @Deprecated("Uses WebView navigation history")
     override fun onBackPressed() {

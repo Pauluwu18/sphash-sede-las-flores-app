@@ -237,6 +237,25 @@ let pendingMissingNames = [];
 let pendingMissingReasons = {};
 let pendingSavePayload = null;
 let currentHistoryRecord = null;
+async function downloadDailyExcel(button, date) {
+  button.disabled = true;
+  try {
+    if (!qrEnabled) throw new Error('Inicia sesión con Supabase para descargar el registro.');
+    const [record, people] = await Promise.all([
+      Splash.call('records', {date}), Splash.call('people')
+    ]);
+    if (!record) throw new Error('No hay un registro guardado para esta fecha. Guarda las llegadas antes de descargar.');
+    await AttendanceExcel.download(record, people);
+  } catch (error) { showToast(error.message || 'No se pudo descargar el Excel.'); }
+  finally { button.disabled = false; }
+}
+document.querySelector('#download-current-excel')?.addEventListener('click', event => {
+  const date = new Intl.DateTimeFormat('es-PE', {day:'2-digit',month:'2-digit',year:'numeric',timeZone:'America/Lima'}).format(new Date());
+  downloadDailyExcel(event.currentTarget, date);
+});
+document.querySelector('#download-history-excel')?.addEventListener('click', event => {
+  if (currentHistoryRecord) downloadDailyExcel(event.currentTarget, currentHistoryRecord.date);
+});
 const inventoryTab = document.querySelector("#inventory-tab");
 const inventoryDrawer = document.querySelector("#inventory-drawer");
 const inventoryClose = document.querySelector("#inventory-close");
