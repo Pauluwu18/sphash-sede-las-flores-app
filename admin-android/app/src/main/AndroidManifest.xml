@@ -27,6 +27,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".VoiceSettingsActivity" android:exported="false" />
         <service android:name=".AttendanceVoiceService" android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service android:name=".AdminMessagingService" android:exported="false">

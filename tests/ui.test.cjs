@@ -23,6 +23,100 @@ function page(file, handler) {
   return dom;
 }
 
+test('Administrador guarda la sesión solo al marcar la casilla y nunca guarda la contraseña', async t => {
+  for (const remember of [false,true]) {
+    const calls=[];
+    const dom=page('admin.html',request=>{
+      calls.push(request);
+      if(request.action==='status') return {ready:true};
+      if(request.action==='admin_login') return {token:'new-session'};
+      if(request.action==='people') return [];
+      if(request.action==='records') return request.payload.date ? null : [];
+      return {ok:true};
+    });
+    t.after(()=>dom.window.close());
+    const w=dom.window,$=id=>w.document.getElementById(id);
+    vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+    vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());
+    assert.equal($('keep-session').checked,false);
+    $('login-user').value='admin';$('login-password').value='private-test-password';
+    $('keep-session').checked=remember;
+    $('login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
+    assert.equal(calls.find(c=>c.action==='admin_login').payload.remember_session,remember);
+    assert.equal(w.localStorage.getItem('splash-admin-session'),remember ? 'new-session':null);
+    assert.equal(w.sessionStorage.getItem('splash-admin-session'),remember ? null:'new-session');
+    assert.equal($('login-password').value,'');
+    assert.ok(!JSON.stringify({...w.localStorage,...w.sessionStorage}).includes('private-test-password'));
+    $('admin-logout').click();await flush();
+    assert.equal(w.Splash.adminSession(),'');
+    assert.ok(calls.some(c=>c.action==='logout' && c.token==='new-session'));
+  }
+});
+
+test('Reabrir administración valida la sesión guardada; vencida se elimina y sin conexión se conserva',async t=>{
+  for(const outcome of ['valid','expired','offline']) {
+    const calls=[];
+    const dom=page('admin.html',request=>{
+      calls.push(request);
+      if(request.action==='people') {
+        if(outcome==='expired') return {error:'Sesión vencida',code:'SESSION'};
+        if(outcome==='offline') throw new Error('Network offline');
+        return [];
+      }
+      if(request.action==='records') return request.payload.date ? null : [];
+      return {ok:true};
+    });
+    t.after(()=>dom.window.close());
+    const w=dom.window,$=id=>w.document.getElementById(id);
+    w.localStorage.setItem('splash-admin-session','remembered');
+    vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+    vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());
+    await flush();
+    assert.equal(calls[0].action,'people');
+    assert.equal(calls[0].token,'remembered');
+    assert.equal(calls.some(c=>c.action==='admin_login'),false);
+    assert.equal($('login-screen').hidden,outcome==='valid');
+    assert.equal(w.Splash.adminSession(),outcome==='expired' ? '':'remembered');
+    assert.equal($('login-form').querySelector('[type="submit"]').disabled,false);
+  }
+});
+
+test('Excel del día e historial descargan datos frescos de Supabase, no cambios locales', async t => {
+  const people=[{id:'a',name:'Persona',active:true,type:'Operario'}];
+  const calls=[], downloads=[];
+  let failure=false;
+  const dom=page('admin.html',request => {
+    calls.push(request);
+    if(request.action==='status') return {ready:true};
+    if(request.action==='admin_login') return {token:'session'};
+    if(request.action==='people') return people;
+    if(request.action==='records') return failure ? {error:'Sin conexión'} : request.payload.date ?
+      {record_date:request.payload.date,arrivals:[{personId:'a',name:'Servidor',late:true,arrivalTime:'07:50'}],report:'Guardado'} : [];
+    return {ok:true};
+  });
+  t.after(()=>dom.window.close());
+  const w=dom.window,$=id=>w.document.getElementById(id);
+  w.AttendanceExcel={download:async (record,roster)=>downloads.push({record,roster})};
+  vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());
+  $('login-user').value='admin';$('login-password').value='test';
+  $('login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
+  $('download-current-excel').click();await flush();
+  assert.equal(downloads.length,1);
+  assert.equal(downloads[0].record.arrivals[0].name,'Servidor');
+  assert.equal(downloads[0].roster[0].id,'a');
+  w.showHistory({arrivals:[],report:'Antiguo'},'01/10/2026');
+  $('download-history-excel').click();await flush();
+  assert.equal(downloads[1].record.record_date,'01/10/2026');
+  assert.equal(downloads[1].record.arrivals.length,1);
+  assert.ok(calls.some(c=>c.action==='records' && c.payload.date==='01/10/2026' && c.token==='session'));
+  failure=true;
+  $('download-history-excel').click();await flush();
+  assert.equal(downloads.length,2);
+  assert.equal($('download-history-excel').disabled,false);
+  assert.match($('toast-text').textContent,/Sin conexión/);
+});
+
 test('Admin usa la API autenticada, rechaza nombres libres y abre perfiles', async t=>{
   const calls=[];
   const people=[{id:'00000000-0000-0000-0000-000000000001',name:'Persona registrada',dni:'00000001',type:'Operario',active:true,has_pin:true}];

@@ -91,30 +91,6 @@ const loginForm = document.querySelector("#login-form");
 const loginMessage = document.querySelector("#login-message");
 const welcomeMessage = document.querySelector("#welcome-message");
 
-// Restauración automática de sesión persistente (checkbox "Mantener sesión").
-window.addEventListener("DOMContentLoaded", async () => {
-  const persistedToken = localStorage.getItem("splash-admin-persist");
-  if (!persistedToken) return;
-  try {
-    qrEnabled = await Splash.available();
-    if (!qrEnabled) return;
-    // Copiar el token a sessionStorage para que la APK nativa también lo detecte.
-    sessionStorage.setItem("splash-admin-session", persistedToken);
-    // Verificar que el token sigue siendo válido usando una llamada liviana.
-    await Splash.call("status");
-    await AdminQR.refresh();
-    peopleResetButton.hidden = true;
-    loginScreen.hidden = true;
-    await loadCurrentRecord(true);
-    renderHistory();
-  } catch {
-    // Token caducado o inválido: eliminar persistencia y mostrar login normal.
-    localStorage.removeItem("splash-admin-persist");
-    sessionStorage.removeItem("splash-admin-session");
-  }
-});
-
-
 const passwordToggle = document.querySelector("#password-toggle");
 const loginPassword = document.querySelector("#login-password");
 passwordToggle.addEventListener("click", () => {
@@ -128,17 +104,16 @@ loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const username = document.querySelector("#login-user").value.trim();
   const password = document.querySelector("#login-password").value;
-  const keepSession = document.querySelector("#keep-session")?.checked || false;
   const submit = loginForm.querySelector('[type="submit"]');
   submit.disabled = true;
   let accepted = false;
   try {
     qrEnabled = await Splash.available();
     if (qrEnabled) {
-      const result = await Splash.call('admin_login', {username,password});
-      sessionStorage.setItem('splash-admin-session', result.token);
-      if (keepSession) localStorage.setItem('splash-admin-persist', result.token);
-      else localStorage.removeItem('splash-admin-persist');
+      const remember = document.querySelector('#keep-session').checked;
+      const result = await Splash.call('admin_login', {username,password,remember_session:remember});
+      Splash.saveAdminSession(result.token, remember);
+      if (window.SplashAdminNative?.enableNotifications) window.SplashAdminNative.enableNotifications();
       await Splash.call('import_people', {names: registeredPeople});
       localStorage.removeItem('splash-registered-people');
       await AdminQR.refresh();
@@ -249,11 +224,11 @@ async function downloadDailyExcel(button, date) {
   } catch (error) { showToast(error.message || 'No se pudo descargar el Excel.'); }
   finally { button.disabled = false; }
 }
-document.querySelector('#download-current-excel')?.addEventListener('click', event => {
+document.querySelector('#download-current-excel').addEventListener('click', event => {
   const date = new Intl.DateTimeFormat('es-PE', {day:'2-digit',month:'2-digit',year:'numeric',timeZone:'America/Lima'}).format(new Date());
   downloadDailyExcel(event.currentTarget, date);
 });
-document.querySelector('#download-history-excel')?.addEventListener('click', event => {
+document.querySelector('#download-history-excel').addEventListener('click', event => {
   if (currentHistoryRecord) downloadDailyExcel(event.currentTarget, currentHistoryRecord.date);
 });
 const inventoryTab = document.querySelector("#inventory-tab");

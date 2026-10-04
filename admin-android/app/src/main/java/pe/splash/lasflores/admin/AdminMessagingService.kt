@@ -13,6 +13,7 @@ import com.google.firebase.messaging.RemoteMessage
 
 class AdminMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
+        if (!getSharedPreferences("push", MODE_PRIVATE).getBoolean("notifications_enabled", true)) return
         val notification = message.notification
         val voice = message.data["kind"] == "attendance_voice"
         if (notification == null && !voice) return

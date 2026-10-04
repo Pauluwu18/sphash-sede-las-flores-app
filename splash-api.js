@@ -1,12 +1,19 @@
 /* La clave pública se configura al final de este archivo; nunca usar service_role. */
 window.Splash = {
+  adminSession() {
+    return sessionStorage.getItem('splash-admin-session') || localStorage.getItem('splash-admin-session') || localStorage.getItem('splash-admin-persist') || '';
+  },
+  saveAdminSession(token, remember = false) {
+    this.clearAdminSession();
+    (remember ? localStorage : sessionStorage).setItem('splash-admin-session', token);
+  },
+  clearAdminSession() {
+    sessionStorage.removeItem('splash-admin-session');
+    localStorage.removeItem('splash-admin-session');
+    localStorage.removeItem('splash-admin-persist');
+  },
   async call(action, payload = {}, role = 'admin') {
-    let token = (role === 'worker' ? localStorage : sessionStorage).getItem(`splash-${role}-session`) || '';
-    // Para el rol admin, si sessionStorage está vacío, intentar con el token persistido.
-    if (role === 'admin' && !token) {
-      token = localStorage.getItem('splash-admin-persist') || '';
-      if (token) sessionStorage.setItem('splash-admin-session', token);
-    }
+    const token = role === 'worker' ? localStorage.getItem('splash-worker-session') || '' : this.adminSession();
     const response = await fetch(`${this.url}/rest/v1/rpc/splash_api`, {
       method: 'POST',
       headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
@@ -16,10 +23,10 @@ window.Splash = {
     if (!response.ok || data?.error) {
       const error = new Error(data?.error || (data?.code === 'PGRST202' ? 'Falta activar la migración QR en Supabase.' : 'No se pudo completar la operación.'));
       error.code = data?.code;
-      if (error.code === 'SESSION') {
+      if (error.code === 'SESSION' && (role === 'worker' || token === this.adminSession())) {
+        if (role === 'admin') this.clearAdminSession();
         sessionStorage.removeItem(`splash-${role}-session`);
         if (role === 'worker') localStorage.removeItem('splash-worker-session');
-        if (role === 'admin') localStorage.removeItem('splash-admin-persist');
         window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: role }));
       }
       throw error;

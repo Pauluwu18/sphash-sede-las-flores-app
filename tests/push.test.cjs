@@ -58,6 +58,10 @@ test('solo sesiones admin reciben avisos por cada registro QR nuevo', async t =>
 
   await db.exec(fs.readFileSync('migrations/20260928_admin_voice.sql','utf8'));
   await db.exec(fs.readFileSync('migrations/20260928_admin_voice.sql','utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_push_lifetime.sql','utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_push_lifetime.sql','utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_remember_session.sql','utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_remember_session.sql','utf8'));
   const voiceRegister = async session => (await db.query(
     "select public.splash_push_registration_voice('register',$1,$2) result",
     [session, device])).rows[0].result;
@@ -72,11 +76,27 @@ test('solo sesiones admin reciben avisos por cada registro QR nuevo', async t =>
   assert.deepEqual(spoken.voice_tokens, [device]);
   assert.equal(spoken.name, 'Operario aviso');
   assert.equal(spoken.event_id, personId + ':' + requests[0].body.work_date);
+  const hoursLeft = async token => Number((await db.query("select extract(epoch from (expires_at-now()))/3600 hours from splash_private.sessions where token_hash=encode(extensions.digest($1,'sha256'),'hex')",[token])).rows[0].hours);
+  const remembered=await api('admin_login',{username:'admin',password:initial,remember_session:true});
+  assert.ok(await hoursLeft(remembered.token)>719);
+  assert.ok(await hoursLeft(admin.token)<=12);
+  await api('logout',{},remembered.token);
+  assert.equal((await api('people',{},remembered.token)).code,'SESSION');
+  const workerRemember=await api('worker_login',{dni:'00000999',pin:'0123',remember_session:true});
+  assert.ok(await hoursLeft(workerRemember.token)<=12);
+  await db.exec("update splash_private.sessions set expires_at=now()-interval '1 minute' where is_admin");
+  assert.deepEqual((await voiceEvent()).voice_tokens,[device]);
+  await db.exec('delete from splash_private.sessions where is_admin');
+  assert.deepEqual((await voiceEvent()).voice_tokens,[device]);
+  await db.exec("update splash_private.admin_push_devices set expires_at=now()-interval '1 minute'");
+  assert.deepEqual((await voiceEvent()).tokens,[]);
+  const renewed=await api('admin_login',{username:'admin',password:initial});
+  await voiceRegister(renewed.token);
   await db.exec('set role anon');
   await assert.rejects(db.query('select public.splash_push_event($1,$2::date)',
     [personId, requests[0].body.work_date]), /permission denied/);
   await db.exec('reset role');
 
-  await api('logout', {}, admin.token);
+  await api('logout', {}, renewed.token);
   assert.equal((await db.query('select count(*)::int n from splash_private.admin_push_devices')).rows[0].n, 0);
 });

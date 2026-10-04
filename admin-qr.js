@@ -43,6 +43,15 @@ window.AdminQR = {
 
 (() => {
   const $ = id => document.getElementById(id);
+  window.addEventListener('splash-push-status', event => {
+    $('admin-push-status').hidden = false;
+    $('admin-push-status').textContent = event.detail;
+  });
+  const voiceButton = $('admin-voice-settings');
+  if (window.SplashAdminNative?.configureVoice) {
+    voiceButton.hidden = false;
+    voiceButton.addEventListener('click', () => window.SplashAdminNative.configureVoice());
+  }
   $('profile-close').addEventListener('click', () => $('profile-dialog').close());
   $('profile-dialog').addEventListener('close', () => { $('profile-pin').textContent = ''; });
   $('profile-form').addEventListener('submit', async event => {
@@ -121,9 +130,12 @@ window.AdminQR = {
     const link = document.createElement('a'); link.download = 'QR-SPLASH-LAS-FLORES.png'; link.href = poster.toDataURL('image/png'); link.click();
   });
   $('admin-logout').addEventListener('click', async () => {
-    try { if (qrEnabled) await Splash.call('logout'); } catch { /* Siempre cerrar la sesión local. */ }
-    localStorage.removeItem('splash-admin-persist');
-    sessionStorage.removeItem('splash-admin-session'); location.reload();
+    if (window.SplashAdminNative?.disableNotifications) window.SplashAdminNative.disableNotifications();
+    const revocation = qrEnabled ? Splash.call('logout') : Promise.resolve();
+    Splash.clearAdminSession();
+    loginScreen.hidden = false;
+    try { await revocation; } catch { /* El acceso local ya está cerrado. */ }
+    location.reload();
   });
   window.addEventListener('splash-session-expired', event => {
     if (event.detail !== 'admin') return;
@@ -134,4 +146,30 @@ window.AdminQR = {
   const stopWatching = Splash.watchAttendance(() => { if (qrEnabled && loginScreen.hidden) loadCurrentRecord(false); });
   window.addEventListener('pagehide', stopWatching);
   setInterval(() => { if (qrEnabled && loginScreen.hidden && peopleDialog.open && !$('profile-dialog').open) AdminQR.refresh().catch(error => showToast(error.message)); }, 3000);
+  async function restoreAdminSession() {
+    const token = Splash.adminSession();
+    if (!token) return;
+    $('keep-session').checked = !!(localStorage.getItem('splash-admin-session') || localStorage.getItem('splash-admin-persist'));
+    // Older APKs read this key directly to register push notifications.
+    sessionStorage.setItem('splash-admin-session', token);
+    const submit = loginForm.querySelector('[type="submit"]');
+    submit.disabled = true;
+    loginMessage.textContent = 'Comprobando tu sesión…';
+    try {
+      await AdminQR.refresh();
+      if (Splash.adminSession() !== token) return;
+      qrEnabled = true;
+      peopleResetButton.hidden = true;
+      loginScreen.hidden = true;
+      loginMessage.textContent = '';
+      if (window.SplashAdminNative?.enableNotifications) window.SplashAdminNative.enableNotifications();
+      await loadCurrentRecord(true);
+      await renderHistory();
+    } catch (error) {
+      loginScreen.hidden = false;
+      loginMessage.textContent = error.code === 'SESSION' ? 'Tu sesión venció. Vuelve a iniciar sesión.' :
+        'No se pudo comprobar tu sesión. Revisa la conexión y vuelve a abrir la app, o inicia sesión.';
+    } finally { submit.disabled = false; }
+  }
+  restoreAdminSession();
 })();

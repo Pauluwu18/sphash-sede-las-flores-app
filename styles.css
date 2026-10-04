@@ -51,6 +51,7 @@ button { cursor: pointer; }
 .login-card input:focus { border-color: #008c95; background: rgba(255,255,255,.82); box-shadow: 0 0 0 3px rgba(24,174,178,.12), 0 0 18px rgba(24,174,178,.08); }
 .login-password-wrap { position: relative; grid-column: 1 / -1; width: 100%; min-width: 0; }
 .login-password-wrap input { padding-right: 52px; }
+.keep-session-help { margin: 7px 0 0; color: #637f91; font-size: .78rem; line-height: 1.5; }
 .password-toggle { position: absolute; top: 5px; right: 5px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; color: #648b97; background: transparent; }
 .password-toggle:hover { color: #008c95; background: rgba(24,174,178,.08); }
 .password-toggle .eye-slash { display: none; }

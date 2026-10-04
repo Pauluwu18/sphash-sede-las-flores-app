@@ -71,9 +71,12 @@ class AttendanceVoiceService : Service() {
                 if (status != TextToSpeech.SUCCESS || tts == null) {
                     stopSelf(); return@post
                 }
-                var language = tts.setLanguage(Locale.forLanguageTag("es-PE"))
-                if (language < 0) language = tts.setLanguage(Locale.forLanguageTag("es-ES"))
-                if (language < 0) { stopSelf(); return@post }
+                val voice = VoicePreferences.resolve(this, tts)
+                if (voice == null || tts.setVoice(voice) != TextToSpeech.SUCCESS) {
+                    getSharedPreferences("attendance_voice", MODE_PRIVATE).edit().putBoolean("needs_setup", true).apply()
+                    stopSelf(); return@post
+                }
+                getSharedPreferences("attendance_voice", MODE_PRIVATE).edit().putBoolean("needs_setup", false).apply()
                 tts.setAudioAttributes(AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())

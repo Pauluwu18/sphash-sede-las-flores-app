@@ -8,6 +8,11 @@ val firebaseConfig = Properties().apply {
     val configFile = rootProject.file("firebase.properties")
     if (configFile.exists()) configFile.inputStream().use(::load)
 }
+val firebaseNames = listOf("FIREBASE_PROJECT_ID", "FIREBASE_SENDER_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY")
+val allowUnconfiguredFirebase = providers.gradleProperty("allowUnconfiguredFirebase").orNull == "true"
+check(allowUnconfiguredFirebase || firebaseNames.all { !firebaseConfig.getProperty(it).isNullOrBlank() }) {
+    "Falta firebase.properties: no se genera una APK sin avisos. Para CI solamente usa -PallowUnconfiguredFirebase=true."
+}
 fun configValue(name: String): String =
     "\"" + (firebaseConfig.getProperty(name) ?: "").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -20,8 +25,8 @@ android {
         applicationId = "pe.splash.lasflores.admin"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
         buildConfigField("String", "SITE_ORIGIN", "\"https://pauluwu18.github.io\"")
         buildConfigField("String", "SITE_URL", "\"https://pauluwu18.github.io/sphash-sede-las-flores-app/\"")
         for (name in listOf("FIREBASE_PROJECT_ID", "FIREBASE_SENDER_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY")) {
