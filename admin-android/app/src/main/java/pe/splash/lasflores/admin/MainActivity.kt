@@ -1,6 +1,11 @@
-package pe.splash.lasflores.admin
+﻿package pe.splash.lasflores.admin
 
 import android.Manifest
+import android.app.DownloadManager
+import android.webkit.PermissionRequest
+import android.webkit.URLUtil
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.NotificationManager
@@ -43,6 +48,10 @@ class MainActivity : Activity() {
     private var lastRegistration = 0L
     private var pendingExcel: ByteArray? = null
     private val excelRequestCode = 11
+    private var cameraRequest: PermissionRequest? = null
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private val cameraPermissionCode = 1001
+    private val fileChooserCode = 1002
     private val excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     private var registering = false
     private var registrationNonce: String? = null
@@ -74,12 +83,15 @@ class MainActivity : Activity() {
             javaScriptEnabled = true
             domStorageEnabled = true
             allowFileAccess = false
-            allowContentAccess = false
+            allowContentAccess = true
+            mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
-        webView.addJavascriptInterface(SiteActions(), "SplashAdminNative")
+        val actions = SiteActions()
+        webView.addJavascriptInterface(actions, "SplashAdminNative")
+        webView.addJavascriptInterface(actions, "SplashAndroid")
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (!request.isForMainFrame) return false
@@ -92,6 +104,7 @@ class MainActivity : Activity() {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                denyCameraRequest()
                 registeredForPage = false
                 registering = false
                 registrationNonce = null
@@ -99,6 +112,7 @@ class MainActivity : Activity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 if (!isSitePage(Uri.parse(url))) return
+                getSharedPreferences("app", MODE_PRIVATE).edit().putString("last_url", url).apply()
                 view.evaluateJavascript(
                     """(function(){
                       if(window.__splashAdminNativeReady)return;
@@ -125,6 +139,38 @@ class MainActivity : Activity() {
         }
         if (savedInstanceState == null) webView.loadUrl(BuildConfig.SITE_URL + "admin.html")
         else webView.restoreState(savedInstanceState)
+    }
+
+    private fun handleCameraRequest(request: PermissionRequest) {
+        denyCameraRequest()
+        if (request.origin.toString().trimEnd('/') != BuildConfig.SITE_ORIGIN ||
+            !isSitePage(Uri.parse(webView.url ?: "")) ||
+            !request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+        ) {
+            request.deny()
+            return
+        }
+        cameraRequest = request
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            grantCameraRequest()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraPermissionCode)
+        }
+    }
+
+    private fun grantCameraRequest() {
+        val request = cameraRequest ?: return
+        cameraRequest = null
+        if (request.origin.toString().trimEnd('/') == BuildConfig.SITE_ORIGIN &&
+            isSitePage(Uri.parse(webView.url ?: "")) &&
+            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        ) request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+        else request.deny()
+    }
+
+    private fun denyCameraRequest() {
+        cameraRequest?.deny()
+        cameraRequest = null
     }
 
     private fun isSitePage(uri: Uri): Boolean =
@@ -345,6 +391,16 @@ class MainActivity : Activity() {
     @Deprecated("Uses the platform document picker")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == fileChooserCode) {
+            val callback = fileCallback
+            fileCallback = null
+            if (callback == null) return
+            val results: Array<Uri>? = if (resultCode == RESULT_OK && data?.data != null) {
+                arrayOf(data.data!!)
+            } else null
+            callback.onReceiveValue(results)
+            return
+        }
         if (requestCode != excelRequestCode) return
         val bytes = pendingExcel
         pendingExcel = null
@@ -365,9 +421,19 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != notificationPermissionCode) return
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) checkAdminSession()
-        else toast("Activa las notificaciones de esta app para recibir las asistencias.")
+        when (requestCode) {
+            notificationPermissionCode -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) checkAdminSession()
+                else toast("Activa las notificaciones de esta app para recibir las asistencias.")
+            }
+            cameraPermissionCode -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) grantCameraRequest()
+                else {
+                    denyCameraRequest()
+                    toast("Permiso de cámara denegado. Puedes intentarlo otra vez.")
+                }
+            }
+        }
     }
 
     override fun onResume() {
