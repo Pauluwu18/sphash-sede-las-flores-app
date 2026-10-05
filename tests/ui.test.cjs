@@ -5,6 +5,22 @@ const vm = require('node:vm');
 const {JSDOM, VirtualConsole} = require('jsdom');
 const flush = async () => { for(let i=0;i<15;i++) await new Promise(resolve => setImmediate(resolve)); };
 
+test('Perfil sin DNI guarda al desmarcar activo; DNI existente sigue siendo obligatorio',async t=>{
+ const calls=[];const people=[{id:'p1',name:'Antony',dni:null,active:true,type:'Operario'},{id:'p2',name:'Otra persona',dni:'12345678',active:true,type:'Operario'}];
+ const dom=page('admin.html',request=>{calls.push(request);if(request.action==='people')return people;if(request.action==='records')return request.payload.date?null:[];return {ok:true};});
+ t.after(()=>dom.window.close());const w=dom.window,$=id=>w.document.getElementById(id);
+ w.sessionStorage.setItem('splash-admin-session','admin');
+ vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+ vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());await flush();
+ w.AdminQR.profile('p1');$('profile-active').checked=false;
+ assert.equal($('profile-form').checkValidity(),true);
+ $('profile-save').click();await flush();
+ const saved=calls.find(c=>c.action==='save_person');assert.equal(saved.payload.active,false);assert.equal(saved.payload.dni,'');
+ assert.equal($('profile-dialog').open,false);
+ w.AdminQR.profile('p2');$('profile-dni').value='';
+ assert.equal($('profile-form').checkValidity(),false);
+});
+
 test('Eliminar desde personas pide confirmación, actualiza lista y no oculta errores',async t=>{
   const calls=[];let exists=true,fail=false;
   const dom=page('admin.html',request=>{

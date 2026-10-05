@@ -1,0 +1,34 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {PGlite}=require('@electric-sql/pglite');
+const {pgcrypto}=require('@electric-sql/pglite/contrib/pgcrypto');
+
+test('Guardar perfil sin DNI permite desactivar, valida DNI y revoca sesiones',async t=>{
+ const db=new PGlite({extensions:{pgcrypto}});t.after(()=>db.close());
+ await db.exec('create role anon; create role authenticated;');
+ await db.exec(`create schema realtime; create function realtime.send(jsonb,text,text,boolean) returns void language sql as 'select';`);
+ await db.exec(fs.readFileSync('supabase-schema.sql','utf8'));
+ const migration=fs.readFileSync('migrations/20261004_profile_without_dni.sql','utf8');
+ const old=migration.split('$old$')[1],replacement=migration.split('$new$')[1];
+ await db.exec(fs.readFileSync('migrations/20260915_qr_attendance.sql','utf8').replace(/\r\n/g,'\n').replace(replacement,()=>old));
+ await db.exec(migration);await db.exec(migration);
+ const api=async(action,payload={},token='')=>(await db.query('select public.splash_api($1,$2::jsonb,$3) result',[action,JSON.stringify(payload),token])).rows[0].result;
+ const password=(await db.query('select password from splash_initial_access')).rows[0].password;
+ const admin=await api('admin_login',{username:'admin',password});
+ await api('import_people',{names:['Persona sin DNI']},admin.token);
+ const person=(await api('people',{},admin.token)).find(p=>p.name==='Persona sin DNI');
+ const payload={id:person.id,name:person.name,dni:'',type:'Operario',active:false};
+ assert.equal((await api('save_person',payload)).code,'SESSION');
+ assert.equal((await api('save_person',payload,admin.token)).ok,true);
+ let updated=(await api('people',{},admin.token)).find(p=>p.id===person.id);
+ assert.equal(updated.active,false);assert.equal(updated.dni,null);
+ assert.ok((await api('save_person',{...payload,dni:'123'},admin.token)).error);
+ assert.ok((await api('save_person',{name:'Nueva persona',dni:''},admin.token)).error);
+ assert.equal((await api('save_person',{...payload,dni:'87654321',active:true},admin.token)).ok,true);
+ assert.ok((await api('save_person',payload,admin.token)).error);
+ const qr=(await api('qr',{},admin.token)).token;
+ const worker=await api('activate',{dni:'87654321',pin:'1234',qr});assert.ok(worker.token);
+ assert.equal((await api('save_person',{...payload,dni:'87654321'},admin.token)).ok,true);
+ assert.equal((await api('checkin',{qr},worker.token)).code,'SESSION');
+});

@@ -306,7 +306,8 @@
     <div class="dialog-heading"><h2 id="profile-title">Perfil del operario</h2><button class="dialog-close" id="profile-close" type="button" aria-label="Cerrar perfil">&times;</button></div>
     <form id="profile-form"><input id="profile-id" type="hidden">
       <label class="worker-label" for="profile-name">Nombre completo</label><input id="profile-name" maxlength="100" required>
-      <label class="worker-label" for="profile-dni">DNI</label><input id="profile-dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" required>
+      <label class="worker-label" for="profile-dni">DNI</label><input id="profile-dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" aria-describedby="profile-dni-help">
+      <p class="worker-help" id="profile-dni-help">Si aún no tiene DNI registrado, puedes guardar su perfil sin completarlo.</p>
       <p class="worker-help">Al cambiar el DNI se elimina el PIN anterior y se cierran las sesiones de esa cuenta.</p>
       <label class="worker-label" for="profile-type">Tipo de persona</label><select id="profile-type"><option>Operario</option><option>Capacitado</option></select>
       <label class="late-toggle"><input id="profile-active" type="checkbox" style="position:static;opacity:1;width:20px;height:20px">Cuenta activa</label>
@@ -326,6 +327,6 @@
   <script src="vendor/exceljs.min.js"></script>
   <script src="attendance-excel.js?v=20261003"></script>
   <script src="app.js?v=20261004-admin"></script>
-  <script src="admin-qr.js?v=20261004-delete"></script>
+  <script src="admin-qr.js?v=20261004-profile"></script>
 </body>
 </html>

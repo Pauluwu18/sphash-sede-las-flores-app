@@ -1,4 +1,9 @@
 SPLASH LAS FLORES - REGISTRO DE CAMBIOS
+Corrección adicional: el perfil de una persona sin DNI permite guardar cambios
+y desmarcar Cuenta activa sin exigir un DNI que nunca tuvo registrado.
+Si se escribe un DNI se validan sus 8 dígitos; si ya existía, no se permite vaciarlo.
+Desactivar la cuenta también revoca sus sesiones. Se conservan sus asistencias.
+Migración adicional: migrations/20261004_profile_without_dni.sql.
 Fecha: 4 de octubre de 2026 (Lima)
 Repositorio: https://github.com/Pauluwu18/sphash-sede-las-flores-app
 Web: https://pauluwu18.github.io/sphash-sede-las-flores-app/admin.html
@@ -69,7 +74,7 @@ Proyecto: C:\Users\M.S.I\Documents\Codex\2026-09-16\us\work\sphash-sede-las-flor
 - Verificada descarga real del 01/10/2026: 8 llegadas, 7 puntuales y 1 tardanza.
 
 6. COMPROBACIONES Y PUBLICACIÓN
-- Resultado de la suite completa: 35 pruebas aprobadas, 0 fallos.
+- Resultado de la suite completa, incluida corrección de DNI: 37 pruebas aprobadas, 0 fallos.
 - Migración de eliminación aplicada correctamente en Supabase el 04/10/2026.
 - Pruebas automáticas de permisos, conservación de historial, revocación de
   sesiones, confirmación/cancelación de eliminación y manejo de errores.
