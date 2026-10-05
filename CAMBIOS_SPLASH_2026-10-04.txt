@@ -1,0 +1,81 @@
+SPLASH LAS FLORES - REGISTRO DE CAMBIOS
+Fecha: 4 de octubre de 2026 (Lima)
+Repositorio: https://github.com/Pauluwu18/sphash-sede-las-flores-app
+Web: https://pauluwu18.github.io/sphash-sede-las-flores-app/admin.html
+Proyecto: C:\Users\M.S.I\Documents\Codex\2026-09-16\us\work\sphash-sede-las-flores-app
+
+1. PERSONAS REGISTRADAS
+- Botón Eliminar en cada fila del menú Personas registradas.
+- Botón Eliminar persona dentro del perfil.
+- Confirmación con el nombre de la persona y explicación del resultado.
+- La persona desaparece del listado y de las sugerencias para nuevos registros.
+- Se desactiva su acceso, se revocan sus sesiones y se retira su PIN.
+- Se conservan asistencias, reportes históricos y auditoría: eliminación lógica.
+- Solo una sesión administrativa válida puede eliminar personas.
+- Una edición antigua no puede reactivar una persona eliminada.
+- Se evita ejecutar eliminaciones simultáneas por doble pulsación.
+- Se muestra el error si la operación falla; se retiró la alternativa que solo
+  desactivaba a la persona y podía mostrar una eliminación que no se realizó.
+- Migración: migrations/20261004_delete_person.sql. Es repetible y mantiene
+  las funciones de sesiones, notificaciones y contraseñas existentes.
+- No se eliminó ninguna persona real como parte de las pruebas.
+- El nombre y DNI siguen reservados para conservar la identidad histórica.
+
+2. APK ADMINISTRACIÓN 1.4
+- applicationId: pe.splash.lasflores.admin; versionCode: 5; versionName: 1.4.
+- APK compilada con configuración Firebase y la misma firma de la APK anterior.
+- Registro y renovación del dispositivo con la API de notificaciones de voz.
+- Estado del registro de avisos visible, manejo de permisos y tiempos de espera.
+- Avisos exclusivos para administradores y compatibles con APK anteriores.
+- No se modificó la APK de operarios ni las contraseñas.
+- Archivo entregado: dist/SPLASH-Admin-v1.4.apk.
+- Copia en escritorio: ASISTENTE BOT - copia (2)/SPLASH-Admin-v1.4.apk.
+- La opción Eliminar se carga desde la web actualizada: no exige otra APK.
+
+3. SESIÓN Y DURACIÓN DE AVISOS
+- Casilla Mantener sesión iniciada: 30 días si se marca, 12 horas sin marcar.
+- Se conserva el token de sesión, nunca la contraseña.
+- Validación al reabrir: la sesión vencida se descarta; un error de conexión
+  no borra automáticamente la sesión guardada.
+- Cerrar sesión elimina el acceso local y revoca los avisos correspondientes.
+- Los dispositivos reciben avisos durante 30 días desde su último registro
+  autenticado, sin depender de la limpieza de sesiones web vencidas.
+- Migraciones aplicadas en Supabase:
+  migrations/20261003_admin_push_lifetime.sql
+  migrations/20261003_admin_remember_session.sql
+- Los tokens emitidos anteriormente no se amplían automáticamente.
+
+4. VOZ FEMENINA Y FIREBASE
+- Confirmado el despliegue de splash-admin-push con compatibilidad de voz.
+- Pantalla Configurar voz femenina: escuchar una voz española del teléfono,
+  confirmar que es femenina y guardar la selección real del motor.
+- No se usa un aumento de tono para simular una voz femenina.
+- Android no proporciona un género universal para todas las voces; si no hay
+  voz válida seleccionada ni metadatos explícitos, permanece el aviso visual.
+- Se anuncia el nombre real y la hora de Lima.
+- Se respetan silencio, volumen de notificaciones y No molestar.
+- Mensajes de voz con vencimiento de 60 segundos y prevención de duplicados.
+- Pendiente de comprobación física: recepción y voz con app abierta, en segundo
+  plano y pantalla bloqueada. No había un teléfono conectado durante el trabajo.
+
+5. EXCEL DIARIO
+- Descarga desde el día actual guardado o desde un día del historial.
+- Consulta datos actualizados de Supabase usando la sesión administrativa.
+- Título verde combinado con fecha; encabezados oscuros.
+- Columnas: EMPLEADO, N° OPERARIO, ESTADO y HORA ENTRADA.
+- N° OPERARIO corresponde al orden de llegada del día.
+- Puntual en verde y Tardanza en amarillo; sin inventar horas faltantes.
+- Descarga compatible con navegador y selector de archivos de Android.
+- Verificada descarga real del 01/10/2026: 8 llegadas, 7 puntuales y 1 tardanza.
+
+6. COMPROBACIONES Y PUBLICACIÓN
+- Resultado de la suite completa: 35 pruebas aprobadas, 0 fallos.
+- Migración de eliminación aplicada correctamente en Supabase el 04/10/2026.
+- Pruebas automáticas de permisos, conservación de historial, revocación de
+  sesiones, confirmación/cancelación de eliminación y manejo de errores.
+- Pruebas existentes de Excel, sesiones, QR y compatibilidad FCM conservadas.
+- APK 1.4 compilada y revisada con assembleDebug y lintDebug.
+- Los cambios se publican en GitHub y GitHub Pages.
+- Preferencia del usuario: subir siempre los cambios del proyecto a GitHub.
+- No se incluyen contraseñas, tokens privados ni archivos de credenciales en
+  este informe ni en los commits.

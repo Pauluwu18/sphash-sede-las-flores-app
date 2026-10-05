@@ -9,8 +9,22 @@ window.AdminQR = {
   render(query = '') {
     const search = query.trim().toLocaleLowerCase();
     peopleList.innerHTML = this.people.filter(p => `${p.name} ${p.dni || ''}`.toLocaleLowerCase().includes(search)).map(p =>
-      `<div class="people-item"><div class="people-item-name"><strong>${Splash.escape(p.name)}</strong><small>${Splash.escape(p.dni || 'DNI pendiente')} · ${p.active ? (p.has_pin ? 'PIN creado' : 'Sin PIN') : 'Inactivo'}</small></div><div class="people-item-actions"><button type="button" data-profile="${p.id}">Perfil</button>${p.active ? `<button type="button" data-use-profile="${p.id}">Usar</button>` : ''}</div></div>`
+      `<div class="people-item"><div class="people-item-name"><strong>${Splash.escape(p.name)}</strong><small>${Splash.escape(p.dni || 'DNI pendiente')} · ${p.active ? (p.has_pin ? 'PIN creado' : 'Sin PIN') : 'Inactivo'}</small></div><div class="people-item-actions"><button type="button" data-profile="${p.id}">Perfil</button>${p.active ? `<button type="button" data-use-profile="${p.id}">Usar</button>` : ''}<button type="button" class="people-delete" data-delete-person="${p.id}" data-person-name="${Splash.escape(p.name)}">Eliminar</button></div></div>`
     ).join('') || '<p class="people-empty">No hay personas que coincidan.</p>';
+  },
+  async delete(id, name) {
+    const personName = name || 'esta persona';
+    if (!window.confirm(`¿Eliminar a «${personName}» de las personas registradas? Se cerrará su acceso. Sus asistencias anteriores se conservarán.`)) return;
+    if (this.deleting) return;
+    this.deleting = true;
+    try {
+      await Splash.call('delete_person', { id });
+      await this.refresh();
+      const profileDlg = document.getElementById('profile-dialog');
+      if (profileDlg && profileDlg.open) profileDlg.close();
+      showToast(`«${personName}» fue eliminado.`);
+    } catch (error) { showToast(error.message || 'No se pudo eliminar a la persona.'); }
+    finally { this.deleting = false; }
   },
   async add() {
     const name = buildFullPersonName(personFirstName.value, personLastName.value);
@@ -82,6 +96,15 @@ window.AdminQR = {
       document.querySelector(`input[name="person-type"][value="${p.type}"]`).checked = true;
       peopleDialog.close(); input.focus();
     }
+    const del = event.target.closest('[data-delete-person]');
+    if (del) {
+      AdminQR.delete(del.dataset.deletePerson, del.dataset.personName);
+    }
+  });
+  $('profile-delete')?.addEventListener('click', () => {
+    const id = $('profile-id').value;
+    const name = $('profile-name').value;
+    if (id) AdminQR.delete(id, name);
   });
 
   let qrURL = '';

@@ -311,7 +311,9 @@
       <label class="worker-label" for="profile-type">Tipo de persona</label><select id="profile-type"><option>Operario</option><option>Capacitado</option></select>
       <label class="late-toggle"><input id="profile-active" type="checkbox" style="position:static;opacity:1;width:20px;height:20px">Cuenta activa</label>
       <p class="pin-display" id="profile-pin"></p><button class="secondary-action" id="profile-pin-show" type="button">Consultar PIN</button>
-      <button class="primary-button" id="profile-save" type="submit">Guardar perfil</button><p id="profile-message" role="status"></p>
+      <button class="primary-button" id="profile-save" type="submit">Guardar perfil</button>
+      <button class="people-reset-button" id="profile-delete" type="button" style="margin-top:10px">Eliminar persona</button>
+      <p id="profile-message" role="status"></p>
     </form>
   </dialog>
   <dialog class="qr-dialog" id="qr-dialog" aria-labelledby="qr-title">
@@ -324,6 +326,6 @@
   <script src="vendor/exceljs.min.js"></script>
   <script src="attendance-excel.js?v=20261003"></script>
   <script src="app.js?v=20261004-admin"></script>
-  <script src="admin-qr.js?v=20261004-admin"></script>
+  <script src="admin-qr.js?v=20261004-delete"></script>
 </body>
 </html>

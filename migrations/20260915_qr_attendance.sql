@@ -24,6 +24,7 @@ create table if not exists splash_private.people (
   created_at timestamptz not null default now()
 );
 create unique index if not exists people_name_unique on splash_private.people (lower(name));
+alter table splash_private.people add column if not exists deleted_at timestamptz;
 create table if not exists splash_private.sessions (
   token_hash text primary key,
   person_id uuid references splash_private.people(id),
@@ -203,14 +204,14 @@ begin
   case action
     when 'people' then
       select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'dni',dni,'type',person_type,'active',active,'has_pin',pin_hash is not null) order by name),'[]'::jsonb)
-      into result from splash_private.people; return result;
+      into result from splash_private.people where deleted_at is null; return result;
     when 'save_person' then
       if nullif(trim(payload->>'name'),'') is null then return jsonb_build_object('error','Escribe el nombre.'); end if;
       if nullif(payload->>'dni','') is null or payload->>'dni' !~ '^[0-9]{8}$' then return jsonb_build_object('error','El DNI debe tener 8 dígitos.'); end if;
       if nullif(payload->>'id','') is null then
         insert into splash_private.people(name,dni,person_type) values(trim(payload->>'name'),payload->>'dni',coalesce(payload->>'type','Operario')) returning id into person.id;
       else
-        select * into person from splash_private.people where id=(payload->>'id')::uuid for update;
+        select * into person from splash_private.people where id=(payload->>'id')::uuid and deleted_at is null for update;
         if person.id is null then return jsonb_build_object('error','La persona no existe.'); end if;
         -- Cambiar DNI revoca PIN y sesiones para no reutilizar credenciales de otra persona.
         if person.dni is distinct from payload->>'dni' then
@@ -232,6 +233,12 @@ begin
       select * into person from splash_private.people where id=(payload->>'id')::uuid;
       insert into splash_private.pin_access_log(person_id) values(person.id);
       return jsonb_build_object('pin',case when person.pin_cipher is not null then extensions.pgp_sym_decrypt(person.pin_cipher,cfg.encryption_key) end);
+    when 'delete_person' then
+      update splash_private.people set active=false,deleted_at=coalesce(deleted_at,now()),pin_hash=null,pin_cipher=null
+        where id=(payload->>'id')::uuid;
+      if not found then return jsonb_build_object('error','La persona no existe.'); end if;
+      delete from splash_private.sessions where person_id=(payload->>'id')::uuid;
+      return '{"ok":true}'::jsonb;
     when 'deactivate_person' then
       update splash_private.people set active=false where id=(payload->>'id')::uuid;
       delete from splash_private.sessions where person_id=(payload->>'id')::uuid;

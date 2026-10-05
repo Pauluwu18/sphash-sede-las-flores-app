@@ -5,6 +5,30 @@ const vm = require('node:vm');
 const {JSDOM, VirtualConsole} = require('jsdom');
 const flush = async () => { for(let i=0;i<15;i++) await new Promise(resolve => setImmediate(resolve)); };
 
+test('Eliminar desde personas pide confirmación, actualiza lista y no oculta errores',async t=>{
+  const calls=[];let exists=true,fail=false;
+  const dom=page('admin.html',request=>{
+    calls.push(request.action);
+    if(request.action==='people')return exists?[{id:'p1',name:'Persona de prueba',active:true,type:'Operario'}]:[];
+    if(request.action==='records')return request.payload.date?null:[];
+    if(request.action==='delete_person') {if(fail)return {error:'No se pudo eliminar'};exists=false;}
+    return {ok:true};
+  });
+  t.after(()=>dom.window.close());const w=dom.window;
+  w.sessionStorage.setItem('splash-admin-session','admin-session');
+  vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());await flush();
+  w.confirm=()=>false;
+  w.document.querySelector('[data-delete-person]').click();await flush();
+  assert.ok(!calls.includes('delete_person'));
+  w.confirm=message=>{assert.match(message,/Persona de prueba/);assert.match(message,/conservarán/);return true;};
+  fail=true;w.document.querySelector('[data-delete-person]').click();await flush();
+  assert.ok(w.document.querySelector('[data-delete-person]'));
+  assert.ok(!calls.includes('deactivate_person'));
+  fail=false;w.document.querySelector('[data-delete-person]').click();await flush();
+  assert.equal(w.document.querySelector('[data-delete-person]'),null);
+});
+
 function page(file, handler) {
   const dom = new JSDOM(fs.readFileSync(file,'utf8'), {url:`https://example.com/${file}`,runScripts:'outside-only',virtualConsole:new VirtualConsole()});
   const w=dom.window;

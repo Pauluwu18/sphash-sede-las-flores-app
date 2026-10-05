@@ -1,5 +1,12 @@
 # SPLASH Las Flores
 
+Registro de cambios: [CAMBIOS_SPLASH_2026-10-04.txt](CAMBIOS_SPLASH_2026-10-04.txt).
+Por indicación del usuario, publicar los cambios del proyecto en GitHub tras verificarlos.
+
+Personas registradas permite eliminar desde la lista o el perfil, con confirmación.
+Se revoca el acceso y se oculta la persona, conservando sus asistencias históricas.
+Aplicar `migrations/20261004_delete_person.sql` después de las migraciones anteriores.
+
 ## Administración 1.4
 
 - Excel diario con empleados, orden de llegada, estado y hora de Lima, descargable desde la web y la APK.
