@@ -12,7 +12,7 @@ test('Guardar perfil sin DNI permite desactivar, valida DNI y revoca sesiones',a
  const migration=fs.readFileSync('migrations/20261004_profile_without_dni.sql','utf8');
  const old=migration.split('$old$')[1],replacement=migration.split('$new$')[1];
  await db.exec(fs.readFileSync('migrations/20260915_qr_attendance.sql','utf8').replace(/\r\n/g,'\n').replace(replacement,()=>old));
- await db.exec(migration);await db.exec(migration);
+ await db.exec(migration.replace(/\r?\n/g,'\r\n'));await db.exec(migration);
  const api=async(action,payload={},token='')=>(await db.query('select public.splash_api($1,$2::jsonb,$3) result',[action,JSON.stringify(payload),token])).rows[0].result;
  const password=(await db.query('select password from splash_initial_access')).rows[0].password;
  const admin=await api('admin_login',{username:'admin',password});

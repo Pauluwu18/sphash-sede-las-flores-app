@@ -46,6 +46,8 @@ $old$;
       return jsonb_build_object('ok',true,'id',person.id);
 $new$;
 begin
+  original:=replace(original,E'\r\n',E'\n');
+  replacement:=replace(replacement,E'\r\n',E'\n');
   select pg_get_functiondef('public.splash_api(text,jsonb,text)'::regprocedure) into definition;
   definition:=replace(definition,E'\r\n',E'\n');
   if position(replacement in definition)>0 then return; end if;
