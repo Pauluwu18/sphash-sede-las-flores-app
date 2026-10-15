@@ -1511,6 +1511,12 @@ function stampPhotoWithText(imgElement, line1, line2, subtext) {
 async function shareCashMovementToWhatsApp(movement) {
   const text = formatCashMovement(movement);
 
+  if (window.SplashAdminNative?.shareToWhatsApp) {
+    window.SplashAdminNative.shareToWhatsApp(movement.photo || "", text);
+    showToast("Abriendo WhatsApp con el reporte...");
+    return;
+  }
+
   if (movement.photo) {
     try {
       const res = await fetch(movement.photo);
@@ -1666,24 +1672,13 @@ async function processAndSaveMovement(andShareToWhatsapp = false) {
   const date = activeCashDate || getDate();
   const time = getTime();
 
-  let finalPhoto = currentCashPhotoData;
-  if (finalPhoto && cashStampCheckbox && cashStampCheckbox.checked && cashPhotoPreviewImg) {
-    const tempM = { type, amount, operator, concept };
-    const formatted = formatCashMovement(tempM);
-    const lines = formatted.split('\n');
-    const line1 = lines[0] || '';
-    const line2 = lines.slice(1).join(' ') || '';
-    const sub = `SPLASH LAS FLORES • ${date} ${time}`;
-    finalPhoto = stampPhotoWithText(cashPhotoPreviewImg, line1, line2, sub);
-  }
-
   const movement = {
     id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     type,
     amount,
     operator,
     concept,
-    photo: finalPhoto || '',
+    photo: currentCashPhotoData || '',
     time,
     timestamp: Date.now()
   };

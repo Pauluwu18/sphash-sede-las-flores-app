@@ -230,3 +230,42 @@ test('Notificación de caja: al registrar un movimiento emite notificación con 
   assert.equal(notifications[0].title, 'SPLASH Control Operativo');
   assert.equal(notifications[0].options.body, 'nuevo registro de caja', 'El cuerpo debe ser exactamente nuevo registro de caja');
 });
+
+test('WhatsApp en APK nativa: comparte imagen limpia y mensaje del reporte a WhatsApp via SplashAdminNative', async (t) => {
+  let sharedImage = null;
+  let sharedText = null;
+  const dom = page('admin.html', () => ({ ok: true }));
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  const $ = (id) => w.document.getElementById(id);
+
+  w.SplashAdminNative = {
+    shareToWhatsApp(photoData, text) {
+      sharedImage = photoData;
+      sharedText = text;
+    }
+  };
+
+  w.sessionStorage.setItem('splash-admin-session', 'admin-token');
+  vm.runInContext(fs.readFileSync('app.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+
+  $('cash-reports-button').click();
+  await flush();
+
+  $('cash-amount').value = '120';
+  $('cash-operator').value = 'ADRIANO';
+  $('cash-concept').value = 'primer servicio';
+
+  const fakeFile = new w.File(['fake-raw-photo-bytes'], 'billete.jpg', { type: 'image/jpeg' });
+  Object.defineProperty($('cash-photo-input'), 'files', { value: [fakeFile] });
+  $('cash-photo-input').dispatchEvent(new w.Event('change'));
+  await flush();
+
+  $('cash-submit-whatsapp-btn').click();
+  await flush();
+
+  assert.ok(sharedImage, 'Debe enviar la imagen limpia a SplashAdminNative.shareToWhatsApp');
+  assert.equal(sharedImage, 'data:image/jpeg;base64,stamped-fake-image', 'La imagen debe enviarse a WhatsApp sin manipulación ni texto estampado posterior');
+  assert.match(sharedText, /ENTRADA S\/120 ADRIANO\s*\n\*primer servicio\*/, 'El texto debe contener el reporte formateado para WhatsApp');
+});

@@ -313,7 +313,66 @@ class MainActivity : Activity() {
             }.setNegativeButton("Ahora no", null).show()
     }
 
+    private fun isAppInstalled(pkg: String, pm: PackageManager): Boolean {
+        return try {
+            pm.getPackageInfo(pkg, 0)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private inner class SiteActions {
+        @JavascriptInterface fun shareToWhatsApp(base64Data: String, messageText: String) {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                try {
+                    val cleanBase64 = if (base64Data.contains(',')) base64Data.substringAfter(',') else base64Data
+                    val isImage = cleanBase64.isNotBlank() && cleanBase64.length > 100
+
+                    if (isImage) {
+                        val reportsDir = File(cacheDir, "reports").apply { mkdirs() }
+                        val reportFile = File(reportsDir, "reporte_caja_${System.currentTimeMillis()}.jpg")
+                        val bytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+                        reportFile.writeBytes(bytes)
+
+                        val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "${packageName}.fileprovider",
+                            reportFile
+                        )
+
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/jpeg"
+                            putExtra(Intent.EXTRA_STREAM, contentUri)
+                            putExtra(Intent.EXTRA_TEXT, messageText)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        val pm = packageManager
+                        val waPackage = when {
+                            isAppInstalled("com.whatsapp", pm) -> "com.whatsapp"
+                            isAppInstalled("com.whatsapp.w4b", pm) -> "com.whatsapp.w4b"
+                            else -> null
+                        }
+
+                        if (waPackage != null) {
+                            intent.setPackage(waPackage)
+                            startActivity(intent)
+                        } else {
+                            startActivity(Intent.createChooser(intent, "Compartir reporte en WhatsApp"))
+                        }
+                    } else {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("https://wa.me/?text=" + Uri.encode(messageText))
+                        }
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    toast("Error al abrir WhatsApp: ${e.message}")
+                }
+            }
+        }
         @JavascriptInterface fun requestCameraPermission() {
             mainHandler.post {
                 if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {

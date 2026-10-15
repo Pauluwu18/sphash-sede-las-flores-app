@@ -25,8 +25,8 @@ android {
         applicationId = "pe.splash.lasflores.admin"
         minSdk = 24
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "1.7"
         buildConfigField("String", "SITE_ORIGIN", "\"https://pauluwu18.github.io\"")
         buildConfigField("String", "SITE_URL", "\"https://pauluwu18.github.io/sphash-sede-las-flores-app/\"")
         for (name in listOf("FIREBASE_PROJECT_ID", "FIREBASE_SENDER_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY")) {
@@ -43,4 +43,5 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
     implementation("com.google.firebase:firebase-messaging")
+    implementation("androidx.core:core-ktx:1.15.0")
 }
