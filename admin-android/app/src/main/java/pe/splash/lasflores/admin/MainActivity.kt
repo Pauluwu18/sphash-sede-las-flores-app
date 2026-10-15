@@ -134,6 +134,36 @@ class MainActivity : Activity() {
                 if (request.isForMainFrame) toast("No se pudo cargar el sitio. Comprueba tu conexión.")
             }
         }
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest) {
+                mainHandler.post { handleCameraRequest(request) }
+            }
+
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                mainHandler.post { if (cameraRequest === request) cameraRequest = null }
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = filePathCallback
+                return try {
+                    val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "image/*"
+                    }
+                    startActivityForResult(intent, fileChooserCode)
+                    true
+                } catch (_: Exception) {
+                    fileCallback?.onReceiveValue(null)
+                    fileCallback = null
+                    false
+                }
+            }
+        }
         webView.setDownloadListener { url, _, _, _, _ ->
             if (isSitePage(Uri.parse(webView.url ?: "")) && url.startsWith("data:image/png;base64,")) saveQr(url)
         }
@@ -141,9 +171,18 @@ class MainActivity : Activity() {
         else webView.restoreState(savedInstanceState)
     }
 
+    private fun isAllowedOrigin(origin: Uri?): Boolean {
+        if (origin == null) return false
+        val originStr = origin.toString().trimEnd('/')
+        if (originStr == BuildConfig.SITE_ORIGIN) return true
+        val originHost = origin.host ?: return false
+        val targetHost = Uri.parse(BuildConfig.SITE_ORIGIN).host ?: return false
+        return originHost.equals(targetHost, ignoreCase = true)
+    }
+
     private fun handleCameraRequest(request: PermissionRequest) {
         denyCameraRequest()
-        if (request.origin.toString().trimEnd('/') != BuildConfig.SITE_ORIGIN ||
+        if (!isAllowedOrigin(request.origin) ||
             !isSitePage(Uri.parse(webView.url ?: "")) ||
             !request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
         ) {
@@ -161,7 +200,7 @@ class MainActivity : Activity() {
     private fun grantCameraRequest() {
         val request = cameraRequest ?: return
         cameraRequest = null
-        if (request.origin.toString().trimEnd('/') == BuildConfig.SITE_ORIGIN &&
+        if (isAllowedOrigin(request.origin) &&
             isSitePage(Uri.parse(webView.url ?: "")) &&
             checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         ) request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
@@ -275,6 +314,13 @@ class MainActivity : Activity() {
     }
 
     private inner class SiteActions {
+        @JavascriptInterface fun requestCameraPermission() {
+            mainHandler.post {
+                if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraPermissionCode)
+                }
+            }
+        }
         @JavascriptInterface fun configureVoice() {
             mainHandler.post {
                 if (isSitePage(Uri.parse(webView.url ?: "")))

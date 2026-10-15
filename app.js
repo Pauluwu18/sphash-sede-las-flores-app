@@ -1385,14 +1385,26 @@ function renderCashQuickOperators() {
 // Iniciar cámara en vivo
 async function startCashLiveCamera() {
   stopCashLiveCamera();
+  if (window.SplashAdminNative?.requestCameraPermission) {
+    try { window.SplashAdminNative.requestCameraPermission(); } catch (_) {}
+  }
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("No hay soporte de mediaDevices");
     }
-    cashCameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
-      audio: false
-    });
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+        audio: false
+      });
+    } catch (e1) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    }
+    cashCameraStream = stream;
     if (cashCameraVideo) {
       cashCameraVideo.srcObject = cashCameraStream;
       await cashCameraVideo.play();
@@ -1400,8 +1412,8 @@ async function startCashLiveCamera() {
     if (cashCameraLiveWrap) cashCameraLiveWrap.hidden = false;
     if (cashCameraButtons) cashCameraButtons.hidden = true;
   } catch (err) {
-    console.warn("No se pudo iniciar cámara en vivo, abriendo selector de sistema:", err);
-    if (cashPhotoInput) cashPhotoInput.click();
+    console.error("No se pudo iniciar la cámara en la app:", err);
+    showToast("No se pudo abrir la cámara. Activa el permiso de cámara en la app.");
   }
 }
 
@@ -1626,6 +1638,9 @@ function openCashReports() {
   activeCashDate = getDate();
   if ("Notification" in window && Notification.permission === "default") {
     try { Notification.requestPermission().catch(() => {}); } catch (_) {}
+  }
+  if (window.SplashAdminNative?.requestCameraPermission) {
+    try { window.SplashAdminNative.requestCameraPermission(); } catch (_) {}
   }
   const selectedType = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
   renderCashConceptPills(selectedType);
