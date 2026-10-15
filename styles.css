@@ -906,3 +906,41 @@ footer { padding-top: 20px; color: var(--muted); font-size: .76rem; text-align: 
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Botón principal prominente para tomar foto primero */
+.cash-photo-main-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 52px;
+  background: linear-gradient(135deg, #007c83, #005a60);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 124, 131, 0.25);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.cash-photo-main-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 124, 131, 0.35);
+}
+.cash-photo-primary {
+  background: #f0fdfa;
+  border: 2px dashed #99f6e4;
+  padding: 14px;
+}
+.cash-photo-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cash-photo-ok-label {
+  color: #0f766e;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
