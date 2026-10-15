@@ -1206,3 +1206,376 @@ refreshCurrentButton.addEventListener("click", () => {
 
 // Cargar al iniciar y luego cada 3 segundos
 setInterval(() => loadCurrentRecord(false), 3000);
+
+
+// =============================================================
+// REPORTES DE CAJA - CONTROL DE ENTRADAS Y SALIDAS DE DINERO
+// =============================================================
+const cashReportsButton = document.querySelector("#cash-reports-button");
+const cashReportsDialog = document.querySelector("#cash-reports-dialog");
+const cashReportsClose = document.querySelector("#cash-reports-close");
+const cashCalendar = document.querySelector("#cash-calendar");
+const cashReportDateLabel = document.querySelector("#cash-report-date-label");
+const cashTotalIncome = document.querySelector("#cash-total-income");
+const cashTotalExpense = document.querySelector("#cash-total-expense");
+const cashCountIncome = document.querySelector("#cash-count-income");
+const cashCountExpense = document.querySelector("#cash-count-expense");
+const cashBalance = document.querySelector("#cash-balance");
+const cashBalanceStatus = document.querySelector("#cash-balance-status");
+const cashMovementForm = document.querySelector("#cash-movement-form");
+const cashAmountInput = document.querySelector("#cash-amount");
+const cashOperatorInput = document.querySelector("#cash-operator");
+const cashOperatorSuggestions = document.querySelector("#cash-operator-suggestions");
+const cashQuickOperators = document.querySelector("#cash-quick-operators");
+const cashConceptInput = document.querySelector("#cash-concept");
+const cashConceptPills = document.querySelector("#cash-concept-pills");
+const cashReportPreview = document.querySelector("#cash-report-preview");
+const cashCopyButton = document.querySelector("#cash-copy-button");
+const cashWhatsappButton = document.querySelector("#cash-whatsapp-button");
+const cashMovementsList = document.querySelector("#cash-movements-list");
+const cashMovementsCount = document.querySelector("#cash-movements-count");
+
+let activeCashDate = "";
+
+function getCashRecordsStore() {
+  try {
+    return JSON.parse(localStorage.getItem("splash-cash-records") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveCashRecordsStore(store) {
+  try {
+    localStorage.setItem("splash-cash-records", JSON.stringify(store));
+  } catch {}
+}
+
+function getMovementsForDate(date) {
+  const store = getCashRecordsStore();
+  return store[date] || [];
+}
+
+function saveMovementsForDate(date, movements) {
+  const store = getCashRecordsStore();
+  store[date] = movements;
+  saveCashRecordsStore(store);
+}
+
+function formatMontoDisplay(num) {
+  const val = Number(num) || 0;
+  return `S/ ${val.toFixed(2)}`;
+}
+
+function formatCashMovement(m) {
+  const montoNum = Number(m.amount) || 0;
+  const montoStr = montoNum % 1 === 0 ? String(montoNum) : montoNum.toFixed(2);
+  const op = (m.operator || '').trim();
+  const concept = (m.concept || '').trim();
+
+  if (m.type === 'ENTRADA') {
+    const line1 = `ENTRADA S/${montoStr}${op ? ' ' + op : ''}`;
+    const formattedConcept = concept ? (concept.startsWith('*') ? concept : `*${concept}*`) : '';
+    return formattedConcept ? `${line1}\n${formattedConcept}` : line1;
+  } else {
+    const isService = /^(?:servicio\s*\d*|\d+(?:er|do|ro|to|to|vo|no)?\s*servicio|primer\s*servicio|segundo\s*servicio|tercer\s*servicio|cuarto\s*servicio|n[uú]mero\s*servicio|\d+)$/i.test(concept);
+    const isSueldo = /^sueldo\b/i.test(concept);
+
+    if (op && isService) {
+      return `SALIDA S/${montoStr} ${op}\n${concept}`;
+    } else if (op && isSueldo) {
+      const detail = concept.toLowerCase().includes(op.toLowerCase()) ? concept : `${concept} ${op}`;
+      return `SALIDA S/${montoStr}\n${detail}`;
+    } else if (op) {
+      return `SALIDA S/${montoStr} ${op}\n${concept}`;
+    } else {
+      return concept ? `SALIDA S/${montoStr}\n${concept}` : `SALIDA S/${montoStr}`;
+    }
+  }
+}
+
+function buildCashReportText(date, movements) {
+  if (!movements || !movements.length) {
+    return `*REPORTE DE CAJA - ${date}*\n*SPLASH SEDE LAS FLORES*\n\nNo hay movimientos registrados para esta fecha.`;
+  }
+  const header = `*REPORTE DE CAJA - ${date}*\n*SPLASH SEDE LAS FLORES*`;
+  const body = movements.map(formatCashMovement).join('\n\n');
+
+  let totalEntradas = 0;
+  let totalSalidas = 0;
+  movements.forEach((m) => {
+    if (m.type === 'ENTRADA') totalEntradas += Number(m.amount) || 0;
+    else totalSalidas += Number(m.amount) || 0;
+  });
+  const saldo = totalEntradas - totalSalidas;
+  const footer = `----------------------------------------\n*TOTAL ENTRADAS:* S/ ${totalEntradas.toFixed(2)}\n*TOTAL SALIDAS:*  S/ ${totalSalidas.toFixed(2)}\n*SALDO EN CAJA:*  S/ ${saldo.toFixed(2)}`;
+  return `${header}\n\n${body}\n\n${footer}`;
+}
+
+function renderCashConceptPills(type) {
+  if (!cashConceptPills) return;
+  const pills = type === 'ENTRADA'
+    ? ['*primer servicio*', '*segundo servicio*', '*tercer servicio*', '*cuarto servicio*', '*lavado completo*', '*servicio extra*']
+    : ['servicio 1', 'servicio 2', 'servicio 3', 'Sueldo', 'Adelanto', 'Insumos', 'Taxi', 'Almuerzo'];
+
+  cashConceptPills.innerHTML = pills.map((p) => `<button type="button" class="cash-pill" data-cash-pill="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('');
+}
+
+function renderCashQuickOperators() {
+  if (!cashQuickOperators) return;
+  if (!arrivals || !arrivals.length) {
+    cashQuickOperators.innerHTML = '<small style="color:var(--muted);font-size:0.75rem">Sin llegadas registradas hoy</small>';
+    return;
+  }
+  cashQuickOperators.innerHTML = arrivals.map((arr, idx) => {
+    const label = `${idx + 1}. ${arr.name}`;
+    return `<button type="button" class="cash-chip" data-cash-op="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+  }).join('');
+}
+
+function renderCashDialog() {
+  if (!cashReportsDialog) return;
+  const date = activeCashDate || getDate();
+  if (cashReportDateLabel) cashReportDateLabel.textContent = date;
+
+  if (cashCalendar && date) {
+    const parts = date.split('/');
+    if (parts.length === 3) cashCalendar.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+
+  const movements = getMovementsForDate(date);
+  let totalEntradas = 0;
+  let totalSalidas = 0;
+  let countEntradas = 0;
+  let countSalidas = 0;
+
+  movements.forEach((m) => {
+    if (m.type === 'ENTRADA') {
+      totalEntradas += Number(m.amount) || 0;
+      countEntradas++;
+    } else {
+      totalSalidas += Number(m.amount) || 0;
+      countSalidas++;
+    }
+  });
+
+  const saldo = totalEntradas - totalSalidas;
+
+  if (cashTotalIncome) cashTotalIncome.textContent = formatMontoDisplay(totalEntradas);
+  if (cashTotalExpense) cashTotalExpense.textContent = formatMontoDisplay(totalSalidas);
+  if (cashCountIncome) cashCountIncome.textContent = `${countEntradas} entrada${countEntradas === 1 ? '' : 's'}`;
+  if (cashCountExpense) cashCountExpense.textContent = `${countSalidas} salida${countSalidas === 1 ? '' : 's'}`;
+  if (cashBalance) {
+    cashBalance.textContent = formatMontoDisplay(saldo);
+    cashBalance.style.color = saldo >= 0 ? 'var(--ink)' : 'var(--coral)';
+  }
+  if (cashBalanceStatus) {
+    cashBalanceStatus.textContent = saldo > 0 ? 'Superávit en caja' : saldo < 0 ? 'Déficit en caja' : 'Equilibrado';
+  }
+
+  if (cashMovementsCount) cashMovementsCount.textContent = movements.length;
+
+  const reportText = buildCashReportText(date, movements);
+  if (cashReportPreview) cashReportPreview.textContent = reportText;
+
+  if (cashMovementsList) {
+    if (!movements.length) {
+      cashMovementsList.innerHTML = '<p class="empty-state">No hay movimientos en esta fecha.</p>';
+    } else {
+      cashMovementsList.innerHTML = movements.map((m, idx) => {
+        const isIncome = m.type === 'ENTRADA';
+        const formatted = formatCashMovement(m);
+        const lines = formatted.split('\n');
+        const line1 = lines[0] || '';
+        const line2 = lines.slice(1).join(' ') || '';
+        return `
+          <div class="cash-movement-item">
+            <span class="cash-movement-badge ${isIncome ? 'income' : 'expense'}">${m.type}</span>
+            <div class="cash-movement-info">
+              <span class="cash-movement-line1">${escapeHtml(line1)}</span>
+              ${line2 ? `<span class="cash-movement-line2">${escapeHtml(line2)}</span>` : ''}
+            </div>
+            <div class="cash-movement-meta">
+              <span class="cash-movement-time">${escapeHtml(m.time || '')}</span>
+              <button type="button" class="cash-movement-del" data-cash-del="${idx}" aria-label="Eliminar movimiento" title="Eliminar">&times;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  renderCashQuickOperators();
+}
+
+function openCashReports() {
+  closeNavigation();
+  activeCashDate = getDate();
+  const selectedType = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
+  renderCashConceptPills(selectedType);
+  renderCashDialog();
+  if (cashReportsDialog) cashReportsDialog.showModal();
+}
+
+if (cashReportsButton) {
+  cashReportsButton.addEventListener('click', openCashReports);
+}
+if (cashReportsClose) {
+  cashReportsClose.addEventListener('click', () => cashReportsDialog.close());
+}
+if (cashReportsDialog) {
+  cashReportsDialog.addEventListener('click', (e) => {
+    if (e.target === cashReportsDialog) cashReportsDialog.close();
+  });
+}
+
+document.querySelectorAll('input[name="cash-type"]').forEach((radio) => {
+  radio.addEventListener('change', (e) => {
+    renderCashConceptPills(e.target.value);
+  });
+});
+
+if (cashConceptPills) {
+  cashConceptPills.addEventListener('click', (e) => {
+    const pill = e.target.closest('[data-cash-pill]');
+    if (!pill) return;
+    cashConceptInput.value = pill.dataset.cashPill;
+    cashConceptInput.focus();
+  });
+}
+
+if (cashQuickOperators) {
+  cashQuickOperators.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-cash-op]');
+    if (!chip) return;
+    cashOperatorInput.value = chip.dataset.cashOp;
+    cashOperatorInput.focus();
+  });
+}
+
+if (cashOperatorInput && cashOperatorSuggestions) {
+  cashOperatorInput.addEventListener('input', () => {
+    const filter = cashOperatorInput.value.trim().toLocaleLowerCase();
+    if (!filter) {
+      cashOperatorSuggestions.hidden = true;
+      cashOperatorSuggestions.innerHTML = '';
+      return;
+    }
+    const matches = (registeredPeople || []).filter((p) => p.toLocaleLowerCase().includes(filter)).slice(0, 5);
+    if (!matches.length) {
+      cashOperatorSuggestions.hidden = true;
+      cashOperatorSuggestions.innerHTML = '';
+      return;
+    }
+    cashOperatorSuggestions.innerHTML = matches.map((name) => `<button type="button" role="option" data-cash-suggest="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
+    cashOperatorSuggestions.hidden = false;
+  });
+
+  cashOperatorSuggestions.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('[data-cash-suggest]');
+    if (!btn) return;
+    cashOperatorInput.value = btn.dataset.cashSuggest;
+    cashOperatorSuggestions.hidden = true;
+  });
+
+  cashOperatorInput.addEventListener('blur', () => {
+    window.setTimeout(() => { cashOperatorSuggestions.hidden = true; }, 150);
+  });
+}
+
+if (cashMovementForm) {
+  cashMovementForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const type = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
+    const amount = parseFloat(cashAmountInput.value);
+    if (isNaN(amount) || amount <= 0) {
+      showToast("Ingresa un monto válido.");
+      cashAmountInput.focus();
+      return;
+    }
+    const concept = (cashConceptInput.value || '').trim();
+    if (!concept) {
+      showToast("Ingresa el detalle o concepto.");
+      cashConceptInput.focus();
+      return;
+    }
+    const operator = (cashOperatorInput.value || '').trim();
+    const date = activeCashDate || getDate();
+    const movements = getMovementsForDate(date);
+    movements.push({
+      id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      type,
+      amount,
+      operator,
+      concept,
+      time: getTime(),
+      timestamp: Date.now()
+    });
+    saveMovementsForDate(date, movements);
+    cashAmountInput.value = '';
+    cashConceptInput.value = '';
+    cashOperatorInput.value = '';
+    renderCashDialog();
+    showToast("Movimiento registrado en caja.");
+  });
+}
+
+if (cashMovementsList) {
+  cashMovementsList.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('[data-cash-del]');
+    if (!delBtn) return;
+    const idx = parseInt(delBtn.dataset.cashDel, 10);
+    const date = activeCashDate || getDate();
+    const movements = getMovementsForDate(date);
+    if (idx >= 0 && idx < movements.length) {
+      movements.splice(idx, 1);
+      saveMovementsForDate(date, movements);
+      renderCashDialog();
+      showToast("Movimiento eliminado.");
+    }
+  });
+}
+
+if (cashCopyButton) {
+  cashCopyButton.addEventListener('click', async () => {
+    const date = activeCashDate || getDate();
+    const movements = getMovementsForDate(date);
+    const text = buildCashReportText(date, movements);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      showToast("Reporte de caja copiado.");
+    } catch {
+      showToast("No se pudo copiar el texto.");
+    }
+  });
+}
+
+if (cashWhatsappButton) {
+  cashWhatsappButton.addEventListener('click', () => {
+    const date = activeCashDate || getDate();
+    const movements = getMovementsForDate(date);
+    const text = buildCashReportText(date, movements);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  });
+}
+
+if (cashCalendar) {
+  cashCalendar.addEventListener('change', () => {
+    const val = cashCalendar.value;
+    if (!val) return;
+    const parts = val.split('-');
+    if (parts.length === 3) {
+      activeCashDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      renderCashDialog();
+    }
+  });
+}

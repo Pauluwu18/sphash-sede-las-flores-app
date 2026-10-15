@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261004-admin">
+  <link rel="stylesheet" href="styles.css?v=20261015-cash">
   <link rel="stylesheet" href="qr-attendance.css?v=session-1">
 </head>
 <body>
@@ -67,6 +67,9 @@
       </button>
       <button class="navigation-action" id="base-movements" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg></span>
         <span><strong>Control de servicios de la base</strong><small>Consultar y finalizar servicios</small></span>
+      </button>
+      <button class="navigation-action" id="cash-reports-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+        <span><strong>Reportes de caja</strong><small>Entradas y salidas de dinero</small></span>
       </button>
       <button class="navigation-action" id="inventory-tab" type="button" aria-expanded="false" aria-controls="inventory-drawer"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 6a5 5 0 0 0-6 6l-5 5a3 3 0 0 0 4 4l5-5a5 5 0 0 0 6-6l-3 3-4-4z"/></svg></span>
         <span><strong>Herramientas</strong><small>Consultar préstamos y devoluciones</small></span>
@@ -185,6 +188,117 @@
 
     <footer>El reporte muestra únicamente las personas registradas.</footer>
   </main>
+  <dialog class="cash-reports-dialog" id="cash-reports-dialog" aria-labelledby="cash-reports-title">
+    <div class="dialog-heading">
+      <div>
+        <p class="section-kicker">Caja y dinero</p>
+        <h2 id="cash-reports-title">Reportes de caja</h2>
+      </div>
+      <button class="dialog-close" id="cash-reports-close" type="button" aria-label="Cerrar reportes de caja">&times;</button>
+    </div>
+    <p class="movements-subtitle">Control de entradas y salidas de dinero de la caja.</p>
+
+    <div class="cash-date-row">
+      <div class="cash-date-info">
+        <span class="field-label" style="margin:0">Fecha de caja:</span>
+        <strong id="cash-report-date-label"></strong>
+      </div>
+      <input class="history-calendar" id="cash-calendar" type="date" aria-label="Seleccionar fecha para reporte de caja">
+    </div>
+
+    <div class="cash-summary-grid">
+      <div class="cash-card income">
+        <span class="cash-card-label">TOTAL ENTRADAS</span>
+        <strong class="cash-card-amount" id="cash-total-income">S/ 0.00</strong>
+        <small id="cash-count-income">0 entradas</small>
+      </div>
+      <div class="cash-card expense">
+        <span class="cash-card-label">TOTAL SALIDAS</span>
+        <strong class="cash-card-amount" id="cash-total-expense">S/ 0.00</strong>
+        <small id="cash-count-expense">0 salidas</small>
+      </div>
+      <div class="cash-card balance">
+        <span class="cash-card-label">SALDO EN CAJA</span>
+        <strong class="cash-card-amount" id="cash-balance">S/ 0.00</strong>
+        <small id="cash-balance-status">Equilibrado</small>
+      </div>
+    </div>
+
+    <div class="cash-section">
+      <div class="cash-section-title">
+        <h3>Registrar movimiento</h3>
+      </div>
+      <form id="cash-movement-form" autocomplete="off">
+        <div class="cash-type-options" role="radiogroup" aria-label="Tipo de movimiento">
+          <label class="cash-type-option income-option">
+            <input type="radio" name="cash-type" value="ENTRADA" checked>
+            <span>+ ENTRADA (Ingreso a caja)</span>
+          </label>
+          <label class="cash-type-option expense-option">
+            <input type="radio" name="cash-type" value="SALIDA">
+            <span>- SALIDA (Retiro de caja)</span>
+          </label>
+        </div>
+
+        <div class="cash-inputs-grid">
+          <div class="cash-field">
+            <label for="cash-amount">Monto (S/)</label>
+            <div class="cash-amount-wrap">
+              <span class="cash-currency-prefix">S/</span>
+              <input id="cash-amount" type="number" step="0.50" min="0.01" placeholder="Ej. 120" required>
+            </div>
+          </div>
+
+          <div class="cash-field">
+            <label for="cash-operator">Operario / Persona <small>(Opcional)</small></label>
+            <div class="cash-operator-wrap">
+              <input id="cash-operator" type="text" maxlength="40" placeholder="Ej. ADRIANO, 3. RAUL..." autocomplete="off">
+              <div class="person-name-suggestions" id="cash-operator-suggestions" role="listbox" hidden></div>
+            </div>
+            <div class="cash-quick-operators" id="cash-quick-operators" aria-label="Operarios de hoy"></div>
+          </div>
+        </div>
+
+        <div class="cash-field" style="margin-top:10px">
+          <label for="cash-concept">Detalle / Servicio / Concepto</label>
+          <input id="cash-concept" type="text" maxlength="100" placeholder="Ej. primer servicio, sueldo, insumos..." required>
+          <div class="cash-concept-pills" id="cash-concept-pills"></div>
+        </div>
+
+        <button class="primary-button cash-submit-btn" type="submit">
+          <span aria-hidden="true">+</span> Registrar en caja
+        </button>
+      </form>
+    </div>
+
+    <div class="cash-section">
+      <div class="cash-section-title">
+        <h3>Texto del reporte (WhatsApp)</h3>
+        <span class="updated-label">Formato automático</span>
+      </div>
+      <div class="report-wrap" style="min-height:140px">
+        <pre class="cash-report-preview" id="cash-report-preview" aria-label="Reporte de caja"></pre>
+      </div>
+      <div class="cash-actions-row">
+        <button class="copy-button" id="cash-copy-button" type="button">
+          <span class="copy-icon" aria-hidden="true"></span> Copiar reporte
+        </button>
+        <button class="whatsapp-button" id="cash-whatsapp-button" type="button">
+          <span aria-hidden="true">&#9742;</span> Compartir por WhatsApp
+        </button>
+      </div>
+    </div>
+
+    <div class="cash-section">
+      <div class="cash-section-title">
+        <h3>Movimientos registrados</h3>
+        <span class="count" id="cash-movements-count">0</span>
+      </div>
+      <div class="cash-movements-list" id="cash-movements-list">
+        <p class="empty-state">No hay movimientos en esta fecha.</p>
+      </div>
+    </div>
+  </dialog>
   <aside class="inventory-drawer" id="inventory-drawer" aria-label="Inventario de herramientas" aria-hidden="true">
     <div class="inventory-heading">
       <div><p class="section-kicker">Control opcional</p><h2>Herramientas</h2><small class="development-label">En desarrollo</small></div>
@@ -326,7 +440,7 @@
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/exceljs.min.js"></script>
   <script src="attendance-excel.js?v=20261003"></script>
-  <script src="app.js?v=20261004-admin"></script>
+  <script src="app.js?v=20261015-cash"></script>
   <script src="admin-qr.js?v=20261004-profile"></script>
 </body>
 </html>
