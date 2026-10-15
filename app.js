@@ -18,6 +18,24 @@ function notifyAttendance(message) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   new Notification("SPLASH Control Operativo", { body: message, icon: "icon.png" });
 }
+function notifyCashRecord() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification("SPLASH Control Operativo", { body: "nuevo registro de caja", icon: "icon.png" });
+  } else if (Notification.permission === "default") {
+    try {
+      const res = Notification.requestPermission();
+      if (res && typeof res.then === "function") {
+        res.then((perm) => {
+          if (perm === "granted") {
+            new Notification("SPLASH Control Operativo", { body: "nuevo registro de caja", icon: "icon.png" });
+          }
+        }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+}
+
 
 async function attendanceFetch(path, options = {}) {
   const method = options.method || "GET";
@@ -1606,6 +1624,9 @@ function renderCashDialog() {
 function openCashReports() {
   closeNavigation();
   activeCashDate = getDate();
+  if ("Notification" in window && Notification.permission === "default") {
+    try { Notification.requestPermission().catch(() => {}); } catch (_) {}
+  }
   const selectedType = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
   renderCashConceptPills(selectedType);
   renderCashDialog();
@@ -1655,6 +1676,8 @@ async function processAndSaveMovement(andShareToWhatsapp = false) {
   const movements = getMovementsForDate(date);
   movements.push(movement);
   saveMovementsForDate(date, movements);
+
+  notifyCashRecord();
 
   cashAmountInput.value = '';
   cashConceptInput.value = '';

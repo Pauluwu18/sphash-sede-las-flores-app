@@ -196,3 +196,37 @@ test('Foto de billete: captura, sellado de datos, vista previa y envío a WhatsA
   assert.match(sharedData.text, /ENTRADA S\/120 ADRIANO/);
   assert.equal(sharedData.files.length, 1);
 });
+
+test('Notificación de caja: al registrar un movimiento emite notificación con texto exacto "nuevo registro de caja"', async (t) => {
+  const dom = page('admin.html', () => ({ ok: true }));
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  const $ = (id) => w.document.getElementById(id);
+
+  const notifications = [];
+  class MockNotification {
+    constructor(title, options) {
+      this.title = title;
+      this.options = options;
+      notifications.push({ title, options });
+    }
+  }
+  MockNotification.permission = 'granted';
+  w.Notification = MockNotification;
+
+  w.sessionStorage.setItem('splash-admin-session', 'admin-token');
+  vm.runInContext(fs.readFileSync('app.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+
+  $('cash-reports-button').click();
+  await flush();
+
+  $('cash-amount').value = '100';
+  $('cash-concept').value = 'prueba notificacion';
+  $('cash-movement-form').dispatchEvent(new w.Event('submit', { cancelable: true }));
+  await flush();
+
+  assert.equal(notifications.length, 1, 'Debe emitirse una notificación al registrar');
+  assert.equal(notifications[0].title, 'SPLASH Control Operativo');
+  assert.equal(notifications[0].options.body, 'nuevo registro de caja', 'El cuerpo debe ser exactamente nuevo registro de caja');
+});
