@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { JSDOM, VirtualConsole } = require('jsdom');
 
 const flush = async () => {
-  for (let i = 0; i < 15; i++) await new Promise((resolve) => setImmediate(resolve));
+  for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
 };
 
 function page(file, handler) {
@@ -17,6 +17,9 @@ function page(file, handler) {
   const w = dom.window;
   w.Response = Response;
   w.fetch = async (url, options = {}) => {
+    if (url.startsWith('data:image')) {
+      return new Response(Buffer.from('fake-image-bytes'), { status: 200 });
+    }
     const result = url.includes('/rpc/splash_api') ? await handler(JSON.parse(options.body)) : [];
     return new Response(JSON.stringify(result), { status: 200 });
   };
@@ -24,7 +27,37 @@ function page(file, handler) {
   w.cancelAnimationFrame = () => {};
   w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   w.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new w.Event('close')); };
-  w.HTMLCanvasElement.prototype.getContext = () => ({});
+  w.HTMLCanvasElement.prototype.getContext = () => ({
+    drawImage() {},
+    createLinearGradient() { return { addColorStop() {} }; },
+    fillRect() {},
+    fillText() {}
+  });
+  w.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/jpeg;base64,stamped-fake-image';
+
+  class MockFileReader {
+    readAsDataURL() {
+      setImmediate(() => {
+        this.result = 'data:image/jpeg;base64,mockrawphoto';
+        if (this.onload) this.onload({ target: this });
+      });
+    }
+  }
+  w.FileReader = MockFileReader;
+
+  class MockImage {
+    constructor() {
+      this.naturalWidth = 800;
+      this.naturalHeight = 600;
+    }
+    set src(val) {
+      this._src = val;
+      setImmediate(() => { if (this.onload) this.onload(); });
+    }
+    get src() { return this._src; }
+  }
+  w.Image = MockImage;
+
   return dom;
 }
 
@@ -77,9 +110,6 @@ test('Reportes de caja: apertura de modal, registro de entradas y salidas con fo
   await flush();
 
   // Verificar totales
-  // Entradas: 120
-  // Salidas: 30 + 50 + 20 = 100
-  // Saldo: 20
   assert.equal($('cash-total-income').textContent, 'S/ 120.00');
   assert.equal($('cash-total-expense').textContent, 'S/ 100.00');
   assert.equal($('cash-balance').textContent, 'S/ 20.00');
@@ -95,7 +125,7 @@ test('Reportes de caja: apertura de modal, registro de entradas y salidas con fo
   assert.match(reportText, /\*SALDO EN CAJA:\*  S\/ 20\.00/);
 
   // 6. Eliminar un movimiento y verificar recálculo
-  const delBtn = w.document.querySelector('[data-cash-del="3"]'); // borrar compra de insumos (20)
+  const delBtn = w.document.querySelector('[data-cash-del="3"]');
   assert.ok(delBtn);
   delBtn.click();
   await flush();
@@ -106,4 +136,63 @@ test('Reportes de caja: apertura de modal, registro de entradas y salidas con fo
   // 7. Cerrar modal
   $('cash-reports-close').click();
   assert.equal($('cash-reports-dialog').open, false);
+});
+
+test('Foto de billete: captura, sellado de datos, vista previa y envío a WhatsApp', async (t) => {
+  let sharedData = null;
+  const dom = page('admin.html', () => ({ ok: true }));
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  const $ = (id) => w.document.getElementById(id);
+
+  // Mock navigator.share
+  w.navigator.canShare = (data) => Boolean(data && data.files);
+  w.navigator.share = async (data) => { sharedData = data; };
+
+  w.sessionStorage.setItem('splash-admin-session', 'admin-token');
+  vm.runInContext(fs.readFileSync('app.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+
+  $('cash-reports-button').click();
+  await flush();
+
+  // Simular foto de billete
+  $('cash-amount').value = '120';
+  $('cash-operator').value = 'ADRIANO';
+  $('cash-concept').value = 'primer servicio';
+
+  // Asignar archivo al input de foto
+  const fakeFile = new w.File(['fake-photo-bits'], 'billete.jpg', { type: 'image/jpeg' });
+  Object.defineProperty($('cash-photo-input'), 'files', { value: [fakeFile] });
+  $('cash-photo-input').dispatchEvent(new w.Event('change'));
+  await flush();
+
+  // Guardar y enviar por WhatsApp
+  assert.ok($('cash-submit-whatsapp-btn'));
+  $('cash-submit-whatsapp-btn').click();
+  await flush();
+
+  // Verificar que se guardó el movimiento con foto
+  const thumb = w.document.querySelector('[data-cash-view-photo="0"]');
+  assert.ok(thumb, 'Debe renderizar la miniatura de la foto');
+
+  // Abrir modal de foto
+  thumb.click();
+  await flush();
+  assert.equal($('cash-photo-modal').open, true, 'Debe abrir el modal de foto');
+  assert.match($('cash-photo-modal-caption').textContent, /ENTRADA S\/120 ADRIANO/);
+
+  // Cerrar modal de foto
+  $('cash-photo-modal-close').click();
+  assert.equal($('cash-photo-modal').open, false);
+
+  // Compartir movimiento específico desde la lista
+  const shareBtn = w.document.querySelector('[data-cash-share-idx="0"]');
+  assert.ok(shareBtn);
+  shareBtn.click();
+  await flush();
+
+  assert.ok(sharedData, 'Debe invocar navigator.share');
+  assert.match(sharedData.text, /ENTRADA S\/120 ADRIANO/);
+  assert.equal(sharedData.files.length, 1);
 });

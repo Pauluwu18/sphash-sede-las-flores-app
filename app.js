@@ -1210,6 +1210,7 @@ setInterval(() => loadCurrentRecord(false), 3000);
 
 // =============================================================
 // REPORTES DE CAJA - CONTROL DE ENTRADAS Y SALIDAS DE DINERO
+// CON FOTO DE BILLETE Y ENVÍO A WHATSAPP
 // =============================================================
 const cashReportsButton = document.querySelector("#cash-reports-button");
 const cashReportsDialog = document.querySelector("#cash-reports-dialog");
@@ -1235,7 +1236,25 @@ const cashWhatsappButton = document.querySelector("#cash-whatsapp-button");
 const cashMovementsList = document.querySelector("#cash-movements-list");
 const cashMovementsCount = document.querySelector("#cash-movements-count");
 
+// Controles de foto del billete
+const cashPhotoInput = document.querySelector("#cash-photo-input");
+const cashStampCheckbox = document.querySelector("#cash-stamp-checkbox");
+const cashPhotoPreviewWrap = document.querySelector("#cash-photo-preview-wrap");
+const cashPhotoPreviewImg = document.querySelector("#cash-photo-preview-img");
+const cashPhotoRemove = document.querySelector("#cash-photo-remove");
+const cashSubmitWhatsappBtn = document.querySelector("#cash-submit-whatsapp-btn");
+
+// Modal de visualización de foto
+const cashPhotoModal = document.querySelector("#cash-photo-modal");
+const cashPhotoModalImg = document.querySelector("#cash-photo-modal-img");
+const cashPhotoModalCaption = document.querySelector("#cash-photo-modal-caption");
+const cashPhotoModalClose = document.querySelector("#cash-photo-modal-close");
+const cashPhotoModalShare = document.querySelector("#cash-photo-modal-share");
+const cashPhotoModalDownload = document.querySelector("#cash-photo-modal-download");
+
 let activeCashDate = "";
+let currentCashPhotoData = ""; // Base64 de la foto seleccionada
+let activeModalMovement = null;
 
 function getCashRecordsStore() {
   try {
@@ -1333,6 +1352,116 @@ function renderCashQuickOperators() {
   }).join('');
 }
 
+/**
+ * Estampa los datos del reporte directamente sobre la foto del billete
+ */
+function stampPhotoWithText(imgElement, line1, line2, subtext) {
+  try {
+    const canvas = document.createElement('canvas');
+    const maxW = 960;
+    let w = imgElement.naturalWidth || imgElement.width || 800;
+    let h = imgElement.naturalHeight || imgElement.height || 600;
+    if (w > maxW) {
+      h = Math.round((h * maxW) / w);
+      w = maxW;
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return imgElement.src;
+
+    ctx.drawImage(imgElement, 0, 0, w, h);
+
+    const bannerHeight = Math.max(80, Math.round(h * 0.22));
+    const grad = ctx.createLinearGradient(0, h - bannerHeight - 20, 0, h);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(0.3, 'rgba(0, 0, 0, 0.7)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, h - bannerHeight - 20, w, bannerHeight + 20);
+
+    const isIncome = line1.startsWith('ENTRADA');
+    const baseFontSize = Math.max(16, Math.round(w * 0.04));
+    ctx.font = `bold ${baseFontSize}px sans-serif`;
+    ctx.fillStyle = isIncome ? '#4ade80' : '#f87171';
+    const padLeft = Math.round(w * 0.04);
+    const bottomPad = Math.round(h * 0.04);
+
+    const yLine1 = h - bottomPad - Math.round(baseFontSize * 1.7);
+    const yLine2 = h - bottomPad - Math.round(baseFontSize * 0.6);
+    const ySub = h - bottomPad + Math.round(baseFontSize * 0.4);
+
+    ctx.fillText(line1, padLeft, yLine1);
+
+    if (line2) {
+      ctx.font = `600 ${Math.round(baseFontSize * 0.85)}px sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(line2, padLeft, yLine2);
+    }
+
+    if (subtext) {
+      ctx.font = `500 ${Math.round(baseFontSize * 0.65)}px sans-serif`;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(subtext, padLeft, ySub);
+    }
+
+    return canvas.toDataURL('image/jpeg', 0.82);
+  } catch {
+    return imgElement.src;
+  }
+}
+
+/**
+ * Comparte un movimiento a WhatsApp adjuntando la foto del billete y el texto
+ */
+async function shareCashMovementToWhatsApp(movement) {
+  const text = formatCashMovement(movement);
+
+  if (movement.photo) {
+    try {
+      const res = await fetch(movement.photo);
+      const blob = await res.blob();
+      const file = new File([blob], `billete_${movement.type.toLowerCase()}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          text: text,
+          title: `Reporte de ${movement.type}`
+        });
+        showToast("Reporte compartido en WhatsApp con foto.");
+        return;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.warn("No se pudo usar navigator.share con archivos:", err);
+    }
+  }
+
+  // Fallback: abre enlace de WhatsApp con el texto
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  showToast("Abriendo WhatsApp con el reporte.");
+}
+
+function openPhotoViewer(movement) {
+  if (!movement || !movement.photo || !cashPhotoModal) return;
+  activeModalMovement = movement;
+  cashPhotoModalImg.src = movement.photo;
+  cashPhotoModalCaption.textContent = formatCashMovement(movement);
+  if (cashPhotoModalDownload) {
+    cashPhotoModalDownload.href = movement.photo;
+    cashPhotoModalDownload.download = `billete_${movement.type.toLowerCase()}_${movement.timestamp || Date.now()}.jpg`;
+  }
+  cashPhotoModal.showModal();
+}
+
+function resetPhotoInput() {
+  currentCashPhotoData = "";
+  if (cashPhotoInput) cashPhotoInput.value = "";
+  if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = "";
+  if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = true;
+}
+
 function renderCashDialog() {
   if (!cashReportsDialog) return;
   const date = activeCashDate || getDate();
@@ -1390,6 +1519,7 @@ function renderCashDialog() {
         const line2 = lines.slice(1).join(' ') || '';
         return `
           <div class="cash-movement-item">
+            ${m.photo ? `<img class="cash-movement-thumb" src="${m.photo}" alt="Foto billete" data-cash-view-photo="${idx}" title="Ver foto del billete">` : ''}
             <span class="cash-movement-badge ${isIncome ? 'income' : 'expense'}">${m.type}</span>
             <div class="cash-movement-info">
               <span class="cash-movement-line1">${escapeHtml(line1)}</span>
@@ -1397,6 +1527,7 @@ function renderCashDialog() {
             </div>
             <div class="cash-movement-meta">
               <span class="cash-movement-time">${escapeHtml(m.time || '')}</span>
+              <button type="button" class="cash-movement-share-btn" data-cash-share-idx="${idx}" aria-label="Enviar a WhatsApp con foto" title="Enviar a WhatsApp con foto">&#9742;</button>
               <button type="button" class="cash-movement-del" data-cash-del="${idx}" aria-label="Eliminar movimiento" title="Eliminar">&times;</button>
             </div>
           </div>
@@ -1415,6 +1546,63 @@ function openCashReports() {
   renderCashConceptPills(selectedType);
   renderCashDialog();
   if (cashReportsDialog) cashReportsDialog.showModal();
+}
+
+async function processAndSaveMovement(andShareToWhatsapp = false) {
+  const type = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
+  const amount = parseFloat(cashAmountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    showToast("Ingresa un monto válido.");
+    cashAmountInput.focus();
+    return;
+  }
+  const concept = (cashConceptInput.value || '').trim();
+  if (!concept) {
+    showToast("Ingresa el detalle o concepto.");
+    cashConceptInput.focus();
+    return;
+  }
+  const operator = (cashOperatorInput.value || '').trim();
+  const date = activeCashDate || getDate();
+  const time = getTime();
+
+  let finalPhoto = currentCashPhotoData;
+  if (finalPhoto && cashStampCheckbox && cashStampCheckbox.checked && cashPhotoPreviewImg) {
+    const tempM = { type, amount, operator, concept };
+    const formatted = formatCashMovement(tempM);
+    const lines = formatted.split('\n');
+    const line1 = lines[0] || '';
+    const line2 = lines.slice(1).join(' ') || '';
+    const sub = `SPLASH LAS FLORES • ${date} ${time}`;
+    finalPhoto = stampPhotoWithText(cashPhotoPreviewImg, line1, line2, sub);
+  }
+
+  const movement = {
+    id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    type,
+    amount,
+    operator,
+    concept,
+    photo: finalPhoto || '',
+    time,
+    timestamp: Date.now()
+  };
+
+  const movements = getMovementsForDate(date);
+  movements.push(movement);
+  saveMovementsForDate(date, movements);
+
+  cashAmountInput.value = '';
+  cashConceptInput.value = '';
+  cashOperatorInput.value = '';
+  resetPhotoInput();
+  renderCashDialog();
+
+  if (andShareToWhatsapp) {
+    await shareCashMovementToWhatsApp(movement);
+  } else {
+    showToast("Movimiento registrado en caja.");
+  }
 }
 
 if (cashReportsButton) {
@@ -1483,56 +1671,115 @@ if (cashOperatorInput && cashOperatorSuggestions) {
   });
 }
 
+// Manejo de foto del billete
+if (cashPhotoInput) {
+  cashPhotoInput.addEventListener('change', () => {
+    const file = cashPhotoInput.files && cashPhotoInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const rawData = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        // Reducir tamaño si es foto de cámara de alta resolución para optimizar
+        const canvas = document.createElement('canvas');
+        const maxW = 960;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > maxW) {
+          h = Math.round((h * maxW) / w);
+          w = maxW;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          currentCashPhotoData = canvas.toDataURL('image/jpeg', 0.82);
+        } else {
+          currentCashPhotoData = rawData;
+        }
+        if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = currentCashPhotoData;
+        if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = false;
+        showToast("Foto del billete cargada.");
+      };
+      img.src = rawData;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+if (cashPhotoRemove) {
+  cashPhotoRemove.addEventListener('click', resetPhotoInput);
+}
+
 if (cashMovementForm) {
   cashMovementForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const type = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
-    const amount = parseFloat(cashAmountInput.value);
-    if (isNaN(amount) || amount <= 0) {
-      showToast("Ingresa un monto válido.");
-      cashAmountInput.focus();
-      return;
-    }
-    const concept = (cashConceptInput.value || '').trim();
-    if (!concept) {
-      showToast("Ingresa el detalle o concepto.");
-      cashConceptInput.focus();
-      return;
-    }
-    const operator = (cashOperatorInput.value || '').trim();
-    const date = activeCashDate || getDate();
-    const movements = getMovementsForDate(date);
-    movements.push({
-      id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-      type,
-      amount,
-      operator,
-      concept,
-      time: getTime(),
-      timestamp: Date.now()
-    });
-    saveMovementsForDate(date, movements);
-    cashAmountInput.value = '';
-    cashConceptInput.value = '';
-    cashOperatorInput.value = '';
-    renderCashDialog();
-    showToast("Movimiento registrado en caja.");
+    processAndSaveMovement(false);
+  });
+}
+
+if (cashSubmitWhatsappBtn) {
+  cashSubmitWhatsappBtn.addEventListener('click', () => {
+    processAndSaveMovement(true);
   });
 }
 
 if (cashMovementsList) {
   cashMovementsList.addEventListener('click', (e) => {
+    // Botón eliminar
     const delBtn = e.target.closest('[data-cash-del]');
-    if (!delBtn) return;
-    const idx = parseInt(delBtn.dataset.cashDel, 10);
-    const date = activeCashDate || getDate();
-    const movements = getMovementsForDate(date);
-    if (idx >= 0 && idx < movements.length) {
-      movements.splice(idx, 1);
-      saveMovementsForDate(date, movements);
-      renderCashDialog();
-      showToast("Movimiento eliminado.");
+    if (delBtn) {
+      const idx = parseInt(delBtn.dataset.cashDel, 10);
+      const date = activeCashDate || getDate();
+      const movements = getMovementsForDate(date);
+      if (idx >= 0 && idx < movements.length) {
+        movements.splice(idx, 1);
+        saveMovementsForDate(date, movements);
+        renderCashDialog();
+        showToast("Movimiento eliminado.");
+      }
+      return;
     }
+
+    // Botón compartir en WhatsApp
+    const shareBtn = e.target.closest('[data-cash-share-idx]');
+    if (shareBtn) {
+      const idx = parseInt(shareBtn.dataset.cashShareIdx, 10);
+      const date = activeCashDate || getDate();
+      const movements = getMovementsForDate(date);
+      if (idx >= 0 && idx < movements.length) {
+        shareCashMovementToWhatsApp(movements[idx]);
+      }
+      return;
+    }
+
+    // Thumbnail de foto
+    const thumb = e.target.closest('[data-cash-view-photo]');
+    if (thumb) {
+      const idx = parseInt(thumb.dataset.cashViewPhoto, 10);
+      const date = activeCashDate || getDate();
+      const movements = getMovementsForDate(date);
+      if (idx >= 0 && idx < movements.length) {
+        openPhotoViewer(movements[idx]);
+      }
+    }
+  });
+}
+
+if (cashPhotoModalClose) {
+  cashPhotoModalClose.addEventListener('click', () => cashPhotoModal.close());
+}
+if (cashPhotoModal) {
+  cashPhotoModal.addEventListener('click', (e) => {
+    if (e.target === cashPhotoModal) cashPhotoModal.close();
+  });
+}
+if (cashPhotoModalShare) {
+  cashPhotoModalShare.addEventListener('click', () => {
+    if (activeModalMovement) shareCashMovementToWhatsApp(activeModalMovement);
   });
 }
 

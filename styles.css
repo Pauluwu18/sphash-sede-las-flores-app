@@ -712,3 +712,197 @@ footer { padding-top: 20px; color: var(--muted); font-size: .76rem; text-align: 
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =============================================================
+   FOTO DE BILLETES Y COMPROBANTES DE CAJA
+   ============================================================= */
+.cash-photo-section {
+  margin: 12px 0 6px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+}
+.cash-photo-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cash-photo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.cash-stamp-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.cash-stamp-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.cash-stamp-toggle small {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.cash-photo-preview-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.cash-photo-preview-card {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  flex-shrink: 0;
+  background: #000;
+}
+.cash-photo-preview-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cash-photo-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.cash-photo-remove:hover {
+  background: #dc2626;
+}
+.cash-photo-hint {
+  font-size: 0.8rem;
+  color: var(--teal-dark);
+  font-weight: 500;
+}
+.cash-submit-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.cash-submit-whatsapp-btn {
+  height: 44px;
+  font-size: 0.88rem;
+  background: #25d366;
+  border: 0;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cash-submit-whatsapp-btn:hover {
+  background: #128c7e;
+}
+.cash-movement-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.cash-movement-thumb:hover {
+  transform: scale(1.08);
+}
+.cash-movement-share-btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.cash-movement-share-btn:hover {
+  background: #128c7e;
+  transform: scale(1.08);
+}
+.cash-photo-modal {
+  width: min(520px, calc(100% - 28px));
+  max-height: min(850px, calc(100% - 28px));
+  padding: 22px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 24px 80px rgba(16,42,67,.35);
+  overflow-y: auto;
+}
+.cash-photo-modal::backdrop {
+  background: rgba(16,42,67,.55);
+  backdrop-filter: blur(4px);
+}
+.cash-photo-modal-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cash-photo-modal-img {
+  width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #0f172a;
+}
+.cash-photo-modal-caption {
+  margin: 0;
+  padding: 12px;
+  background: #102a43;
+  color: #f0fdf4;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 600px) {
+  .cash-submit-row {
+    grid-template-columns: 1fr;
+  }
+}

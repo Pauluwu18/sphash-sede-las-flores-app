@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261015-cash">
+  <link rel="stylesheet" href="styles.css?v=20261015-photo">
   <link rel="stylesheet" href="qr-attendance.css?v=session-1">
 </head>
 <body>
@@ -265,9 +265,39 @@
           <div class="cash-concept-pills" id="cash-concept-pills"></div>
         </div>
 
-        <button class="primary-button cash-submit-btn" type="submit">
-          <span aria-hidden="true">+</span> Registrar en caja
-        </button>
+        <div class="cash-photo-section">
+          <input id="cash-photo-input" type="file" accept="image/*" capture="environment" class="visually-hidden">
+          <div class="cash-photo-controls">
+            <label for="cash-photo-input" class="secondary-action cash-photo-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span>Tomar foto del billete</span>
+            </label>
+            <label class="cash-stamp-toggle" for="cash-stamp-checkbox" title="Agrega una franja con los datos del reporte directamente sobre la foto">
+              <input id="cash-stamp-checkbox" type="checkbox" checked>
+              <span class="toggle-ui" aria-hidden="true"></span>
+              <small>Sellar datos en foto</small>
+            </label>
+          </div>
+          <div class="cash-photo-preview-wrap" id="cash-photo-preview-wrap" hidden>
+            <div class="cash-photo-preview-card">
+              <img id="cash-photo-preview-img" alt="Foto del billete">
+              <button type="button" class="cash-photo-remove" id="cash-photo-remove" aria-label="Quitar foto">&times;</button>
+            </div>
+            <span class="cash-photo-hint">Foto del billete lista para reportar por WhatsApp.</span>
+          </div>
+        </div>
+
+        <div class="cash-submit-row">
+          <button class="primary-button cash-submit-btn" id="cash-submit-btn" type="submit">
+            <span aria-hidden="true">+</span> Guardar en caja
+          </button>
+          <button class="whatsapp-button cash-submit-whatsapp-btn" id="cash-submit-whatsapp-btn" type="button">
+            <span aria-hidden="true">&#9742;</span> Guardar y enviar por WhatsApp
+          </button>
+        </div>
       </form>
     </div>
 
@@ -297,6 +327,27 @@
       <div class="cash-movements-list" id="cash-movements-list">
         <p class="empty-state">No hay movimientos en esta fecha.</p>
       </div>
+    </div>
+  </dialog>
+  <dialog class="cash-photo-modal" id="cash-photo-modal" aria-labelledby="cash-photo-modal-title">
+    <div class="dialog-heading">
+      <div>
+        <p class="section-kicker">Comprobante de caja</p>
+        <h2 id="cash-photo-modal-title">Foto del billete / movimiento</h2>
+      </div>
+      <button class="dialog-close" id="cash-photo-modal-close" type="button" aria-label="Cerrar foto">&times;</button>
+    </div>
+    <div class="cash-photo-modal-body">
+      <img id="cash-photo-modal-img" class="cash-photo-modal-img" alt="Foto ampliada del billete">
+      <pre id="cash-photo-modal-caption" class="cash-photo-modal-caption"></pre>
+    </div>
+    <div class="cash-actions-row" style="margin-top:14px">
+      <button class="whatsapp-button" id="cash-photo-modal-share" type="button">
+        <span aria-hidden="true">&#9742;</span> Enviar a WhatsApp
+      </button>
+      <a class="secondary-action" id="cash-photo-modal-download" download="comprobante_caja.jpg" style="display:flex;align-items:center;justify-content:center;text-decoration:none">
+        Descargar imagen
+      </a>
     </div>
   </dialog>
   <aside class="inventory-drawer" id="inventory-drawer" aria-label="Inventario de herramientas" aria-hidden="true">
@@ -440,7 +491,7 @@
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/exceljs.min.js"></script>
   <script src="attendance-excel.js?v=20261003"></script>
-  <script src="app.js?v=20261015-cash"></script>
+  <script src="app.js?v=20261015-photo"></script>
   <script src="admin-qr.js?v=20261004-profile"></script>
 </body>
 </html>
