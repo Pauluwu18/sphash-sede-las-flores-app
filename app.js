@@ -1210,7 +1210,7 @@ setInterval(() => loadCurrentRecord(false), 3000);
 
 // =============================================================
 // REPORTES DE CAJA - CONTROL DE ENTRADAS Y SALIDAS DE DINERO
-// CON FOTO DE BILLETE Y ENVÍO A WHATSAPP
+// CON CÁMARA EN VIVO, MONTOS RÁPIDOS Y WHATSAPP
 // =============================================================
 const cashReportsButton = document.querySelector("#cash-reports-button");
 const cashReportsDialog = document.querySelector("#cash-reports-dialog");
@@ -1225,6 +1225,7 @@ const cashBalance = document.querySelector("#cash-balance");
 const cashBalanceStatus = document.querySelector("#cash-balance-status");
 const cashMovementForm = document.querySelector("#cash-movement-form");
 const cashAmountInput = document.querySelector("#cash-amount");
+const cashAmountPills = document.querySelector("#cash-amount-pills");
 const cashOperatorInput = document.querySelector("#cash-operator");
 const cashOperatorSuggestions = document.querySelector("#cash-operator-suggestions");
 const cashQuickOperators = document.querySelector("#cash-quick-operators");
@@ -1236,7 +1237,13 @@ const cashWhatsappButton = document.querySelector("#cash-whatsapp-button");
 const cashMovementsList = document.querySelector("#cash-movements-list");
 const cashMovementsCount = document.querySelector("#cash-movements-count");
 
-// Controles de foto del billete
+// Controles de cámara en vivo y foto
+const cashOpenCameraBtn = document.querySelector("#cash-open-camera-btn");
+const cashCameraLiveWrap = document.querySelector("#cash-camera-live-wrap");
+const cashCameraVideo = document.querySelector("#cash-camera-video");
+const cashCameraCaptureBtn = document.querySelector("#cash-camera-capture-btn");
+const cashCameraCloseBtn = document.querySelector("#cash-camera-close-btn");
+const cashCameraButtons = document.querySelector("#cash-camera-buttons");
 const cashPhotoInput = document.querySelector("#cash-photo-input");
 const cashStampCheckbox = document.querySelector("#cash-stamp-checkbox");
 const cashPhotoPreviewWrap = document.querySelector("#cash-photo-preview-wrap");
@@ -1253,8 +1260,9 @@ const cashPhotoModalShare = document.querySelector("#cash-photo-modal-share");
 const cashPhotoModalDownload = document.querySelector("#cash-photo-modal-download");
 
 let activeCashDate = "";
-let currentCashPhotoData = ""; // Base64 de la foto seleccionada
+let currentCashPhotoData = "";
 let activeModalMovement = null;
+let cashCameraStream = null;
 
 function getCashRecordsStore() {
   try {
@@ -1281,14 +1289,18 @@ function saveMovementsForDate(date, movements) {
   saveCashRecordsStore(store);
 }
 
+function formatMontoExact(num) {
+  const n = Number(num) || 0;
+  return n % 1 === 0 ? String(n) : n.toFixed(2);
+}
+
 function formatMontoDisplay(num) {
   const val = Number(num) || 0;
   return `S/ ${val.toFixed(2)}`;
 }
 
 function formatCashMovement(m) {
-  const montoNum = Number(m.amount) || 0;
-  const montoStr = montoNum % 1 === 0 ? String(montoNum) : montoNum.toFixed(2);
+  const montoStr = formatMontoExact(m.amount);
   const op = (m.operator || '').trim();
   const concept = (m.concept || '').trim();
 
@@ -1352,9 +1364,64 @@ function renderCashQuickOperators() {
   }).join('');
 }
 
-/**
- * Estampa los datos del reporte directamente sobre la foto del billete
- */
+// Iniciar cámara en vivo
+async function startCashLiveCamera() {
+  stopCashLiveCamera();
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("No hay soporte de mediaDevices");
+    }
+    cashCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+      audio: false
+    });
+    if (cashCameraVideo) {
+      cashCameraVideo.srcObject = cashCameraStream;
+      await cashCameraVideo.play();
+    }
+    if (cashCameraLiveWrap) cashCameraLiveWrap.hidden = false;
+    if (cashCameraButtons) cashCameraButtons.hidden = true;
+  } catch (err) {
+    console.warn("No se pudo iniciar cámara en vivo, abriendo selector de sistema:", err);
+    if (cashPhotoInput) cashPhotoInput.click();
+  }
+}
+
+function captureCashLiveFrame() {
+  if (!cashCameraVideo || !cashCameraStream) return;
+  const canvas = document.createElement("canvas");
+  const maxW = 960;
+  let w = cashCameraVideo.videoWidth || 800;
+  let h = cashCameraVideo.videoHeight || 600;
+  if (w > maxW) {
+    h = Math.round((h * maxW) / w);
+    w = maxW;
+  }
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.drawImage(cashCameraVideo, 0, 0, w, h);
+    currentCashPhotoData = canvas.toDataURL("image/jpeg", 0.85);
+    if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = currentCashPhotoData;
+    if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = false;
+    showToast("Foto del billete capturada.");
+  }
+  stopCashLiveCamera();
+}
+
+function stopCashLiveCamera() {
+  if (cashCameraStream) {
+    cashCameraStream.getTracks().forEach((track) => track.stop());
+    cashCameraStream = null;
+  }
+  if (cashCameraVideo) {
+    cashCameraVideo.srcObject = null;
+  }
+  if (cashCameraLiveWrap) cashCameraLiveWrap.hidden = true;
+  if (cashCameraButtons) cashCameraButtons.hidden = false;
+}
+
 function stampPhotoWithText(imgElement, line1, line2, subtext) {
   try {
     const canvas = document.createElement('canvas');
@@ -1411,9 +1478,6 @@ function stampPhotoWithText(imgElement, line1, line2, subtext) {
   }
 }
 
-/**
- * Comparte un movimiento a WhatsApp adjuntando la foto del billete y el texto
- */
 async function shareCashMovementToWhatsApp(movement) {
   const text = formatCashMovement(movement);
 
@@ -1438,7 +1502,6 @@ async function shareCashMovementToWhatsApp(movement) {
     }
   }
 
-  // Fallback: abre enlace de WhatsApp con el texto
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   showToast("Abriendo WhatsApp con el reporte.");
 }
@@ -1457,6 +1520,7 @@ function openPhotoViewer(movement) {
 
 function resetPhotoInput() {
   currentCashPhotoData = "";
+  stopCashLiveCamera();
   if (cashPhotoInput) cashPhotoInput.value = "";
   if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = "";
   if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = true;
@@ -1609,12 +1673,39 @@ if (cashReportsButton) {
   cashReportsButton.addEventListener('click', openCashReports);
 }
 if (cashReportsClose) {
-  cashReportsClose.addEventListener('click', () => cashReportsDialog.close());
+  cashReportsClose.addEventListener('click', () => {
+    stopCashLiveCamera();
+    cashReportsDialog.close();
+  });
 }
 if (cashReportsDialog) {
   cashReportsDialog.addEventListener('click', (e) => {
-    if (e.target === cashReportsDialog) cashReportsDialog.close();
+    if (e.target === cashReportsDialog) {
+      stopCashLiveCamera();
+      cashReportsDialog.close();
+    }
   });
+}
+
+// Botones de monto rápido
+if (cashAmountPills) {
+  cashAmountPills.addEventListener('click', (e) => {
+    const pill = e.target.closest('[data-amount]');
+    if (!pill) return;
+    cashAmountInput.value = pill.dataset.amount;
+    cashAmountInput.focus();
+  });
+}
+
+// Cámara en vivo
+if (cashOpenCameraBtn) {
+  cashOpenCameraBtn.addEventListener('click', startCashLiveCamera);
+}
+if (cashCameraCaptureBtn) {
+  cashCameraCaptureBtn.addEventListener('click', captureCashLiveFrame);
+}
+if (cashCameraCloseBtn) {
+  cashCameraCloseBtn.addEventListener('click', stopCashLiveCamera);
 }
 
 document.querySelectorAll('input[name="cash-type"]').forEach((radio) => {
@@ -1671,7 +1762,7 @@ if (cashOperatorInput && cashOperatorSuggestions) {
   });
 }
 
-// Manejo de foto del billete
+// Manejo de foto del billete desde archivo
 if (cashPhotoInput) {
   cashPhotoInput.addEventListener('change', () => {
     const file = cashPhotoInput.files && cashPhotoInput.files[0];
@@ -1682,7 +1773,6 @@ if (cashPhotoInput) {
       const rawData = e.target.result;
       const img = new Image();
       img.onload = () => {
-        // Reducir tamaño si es foto de cámara de alta resolución para optimizar
         const canvas = document.createElement('canvas');
         const maxW = 960;
         let w = img.naturalWidth || img.width;
@@ -1729,7 +1819,6 @@ if (cashSubmitWhatsappBtn) {
 
 if (cashMovementsList) {
   cashMovementsList.addEventListener('click', (e) => {
-    // Botón eliminar
     const delBtn = e.target.closest('[data-cash-del]');
     if (delBtn) {
       const idx = parseInt(delBtn.dataset.cashDel, 10);
@@ -1744,7 +1833,6 @@ if (cashMovementsList) {
       return;
     }
 
-    // Botón compartir en WhatsApp
     const shareBtn = e.target.closest('[data-cash-share-idx]');
     if (shareBtn) {
       const idx = parseInt(shareBtn.dataset.cashShareIdx, 10);
@@ -1756,7 +1844,6 @@ if (cashMovementsList) {
       return;
     }
 
-    // Thumbnail de foto
     const thumb = e.target.closest('[data-cash-view-photo]');
     if (thumb) {
       const idx = parseInt(thumb.dataset.cashViewPhoto, 10);

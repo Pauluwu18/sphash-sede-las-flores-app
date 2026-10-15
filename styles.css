@@ -944,3 +944,110 @@ footer { padding-top: 20px; color: var(--muted); font-size: .76rem; text-align: 
   font-size: 0.88rem;
   font-weight: 700;
 }
+
+
+/* =============================================================
+   VISOR DE CÁMARA EN VIVO Y BOTONES RÁPIDOS DE MONTO
+   ============================================================= */
+.cash-camera-live-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.cash-camera-live-wrap video {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  display: block;
+}
+.cash-camera-live-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px;
+  background: rgba(16, 42, 67, 0.9);
+}
+.cash-camera-capture-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 24px;
+  background: #25d366;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 211, 102, 0.4);
+  transition: transform 0.15s, background 0.15s;
+}
+.cash-camera-capture-btn:hover {
+  background: #128c7e;
+  transform: scale(1.04);
+}
+.cash-camera-shutter {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: transparent;
+}
+.cash-camera-close-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 20px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.cash-camera-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cash-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  border-color: #cbd5e1;
+}
+.cash-file-btn:hover {
+  color: var(--ink);
+  background: #f1f5f9;
+}
+.cash-amount-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.cash-amount-pill {
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cash-amount-pill:hover, .cash-amount-pill.active {
+  background: var(--soft-teal);
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}

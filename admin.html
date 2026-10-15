@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1792073298840">
+  <link rel="stylesheet" href="styles.css?v=1792074313762">
   <link rel="stylesheet" href="qr-attendance.css?v=session-1">
 </head>
 <body>
@@ -229,14 +229,35 @@
         <h3>1. Foto del billete (Tomar foto primero)</h3>
       </div>
       <div class="cash-photo-section cash-photo-primary">
-        <input id="cash-photo-input" type="file" accept="image/*" capture="environment" class="visually-hidden">
-        <label for="cash-photo-input" class="cash-photo-main-btn" id="cash-photo-main-btn">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
-          </svg>
-          <span>📸 Tomar foto del billete ahora</span>
-        </label>
+        <!-- Visor de cámara en vivo dentro de la app -->
+        <div class="cash-camera-live-wrap" id="cash-camera-live-wrap" hidden>
+          <video id="cash-camera-video" playsinline autoplay muted></video>
+          <div class="cash-camera-live-actions">
+            <button type="button" class="cash-camera-capture-btn" id="cash-camera-capture-btn">
+              <span class="cash-camera-shutter"></span>
+              <span>Capturar foto</span>
+            </button>
+            <button type="button" class="cash-camera-close-btn" id="cash-camera-close-btn">
+              Cancelar
+            </button>
+          </div>
+        </div>
+
+        <div class="cash-camera-buttons" id="cash-camera-buttons">
+          <button type="button" class="cash-photo-main-btn" id="cash-open-camera-btn">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span>📸 Abrir cámara del billete</span>
+          </button>
+
+          <input id="cash-photo-input" type="file" accept="image/*" capture="environment" class="visually-hidden">
+          <label for="cash-photo-input" class="secondary-action cash-file-btn" id="cash-file-btn">
+            📁 Usar cámara del sistema / Galería
+          </label>
+        </div>
+
         <div class="cash-photo-preview-wrap" id="cash-photo-preview-wrap" hidden>
           <div class="cash-photo-preview-card">
             <img id="cash-photo-preview-img" alt="Foto del billete">
@@ -252,6 +273,7 @@
           </div>
         </div>
       </div>
+    </div>
     </div>
 
     <div class="cash-section" style="margin-top:16px">
@@ -272,10 +294,20 @@
 
         <div class="cash-inputs-grid">
           <div class="cash-field">
-            <label for="cash-amount">Monto (S/)</label>
+            <label for="cash-amount">Monto (S/) <small style="font-weight:normal;color:var(--muted)">(Ej. 100, 120 o 130.30)</small></label>
             <div class="cash-amount-wrap">
               <span class="cash-currency-prefix">S/</span>
-              <input id="cash-amount" type="number" step="0.50" min="0.01" placeholder="Ej. 120" required>
+              <input id="cash-amount" type="number" step="any" min="0.01" inputmode="decimal" placeholder="100, 120 o 130.30" required>
+            </div>
+            <div class="cash-amount-pills" id="cash-amount-pills">
+              <button type="button" class="cash-amount-pill" data-amount="20">S/20</button>
+              <button type="button" class="cash-amount-pill" data-amount="30">S/30</button>
+              <button type="button" class="cash-amount-pill" data-amount="50">S/50</button>
+              <button type="button" class="cash-amount-pill" data-amount="80">S/80</button>
+              <button type="button" class="cash-amount-pill" data-amount="100">S/100</button>
+              <button type="button" class="cash-amount-pill" data-amount="120">S/120</button>
+              <button type="button" class="cash-amount-pill" data-amount="150">S/150</button>
+              <button type="button" class="cash-amount-pill" data-amount="200">S/200</button>
             </div>
           </div>
 
@@ -496,7 +528,7 @@
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/exceljs.min.js"></script>
   <script src="attendance-excel.js?v=20261003"></script>
-  <script src="app.js?v=1792073298840"></script>
+  <script src="app.js?v=1792074313762"></script>
   <script src="admin-qr.js?v=20261004-profile"></script>
 </body>
 </html>
