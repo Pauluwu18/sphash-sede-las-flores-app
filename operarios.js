@@ -763,7 +763,7 @@
   // =========================================================================
   // SISTEMA DE ACTUALIZACION DE LA APP DESDE LA MISMA APLICACION (Supabase)
   // =========================================================================
-  const DEFAULT_APK_URL = 'https://pauluwu18.github.io/sphash-sede-las-flores-app/SPLASH-Operarios.apk';
+  const DEFAULT_APK_URL = 'https://raw.githubusercontent.com/Pauluwu18/sphash-sede-las-flores-app/main/SPLASH-Operarios.apk';
   let cachedLatestApkUrl = DEFAULT_APK_URL;
 
   function getCurrentVersionCode() {
@@ -806,24 +806,29 @@
     }
 
     // 2. Si está en la APK antigua (v1.0) o navegador web:
-    try {
-      const a = document.createElement('a');
-      a.href = targetUrl;
-      a.download = targetUrl.split('/').pop() || 'SPLASH-Operarios.apk';
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (_) {}
-
-    // En WebView antiguo, window.location.href dispara shouldOverrideUrlLoading/setDownloadListener
     if (isInstallAction) {
+      try {
+        window.open(targetUrl, '_blank');
+      } catch (_) {}
+
+      try {
+        const a = document.createElement('a');
+        a.href = targetUrl;
+        a.download = 'SPLASH-Operarios.apk';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (_) {}
+
+      // En WebView antiguo, window.location.href a un dominio externo (raw.githubusercontent.com)
+      // dispara shouldOverrideUrlLoading y abre la descarga directamente en el sistema
       setTimeout(() => {
         try {
           window.location.href = targetUrl;
         } catch (_) {}
-      }, 300);
+      }, 100);
     }
   }
 

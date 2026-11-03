@@ -2229,15 +2229,18 @@ const adminUpdateBannerBtn = document.querySelector("#admin-update-banner-btn");
 const adminUpdateBannerManage = document.querySelector("#admin-update-banner-manage");
 const adminLoginDownloadApk = document.querySelector("#admin-login-download-apk");
 
-const DEFAULT_ADMIN_APK_URL = 'https://pauluwu18.github.io/sphash-sede-las-flores-app/SPLASH-Admin.apk';
+const DEFAULT_ADMIN_APK_URL = 'https://raw.githubusercontent.com/Pauluwu18/sphash-sede-las-flores-app/main/SPLASH-Admin.apk';
 let cachedAdminApkUrl = DEFAULT_ADMIN_APK_URL;
 
 function triggerDownloadAdminApk(url) {
   const target = url || cachedAdminApkUrl || DEFAULT_ADMIN_APK_URL;
   try {
+    window.open(target, '_blank');
+  } catch (_) {}
+  try {
     const a = document.createElement('a');
     a.href = target;
-    a.download = target.split('/').pop() || 'SPLASH-Admin.apk';
+    a.download = 'SPLASH-Admin.apk';
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     document.body.appendChild(a);
@@ -2246,7 +2249,7 @@ function triggerDownloadAdminApk(url) {
   } catch (_) {}
   setTimeout(() => {
     try { window.location.href = target; } catch (_) {}
-  }, 300);
+  }, 100);
 }
 
 async function checkAdminAppVersionQuietly() {

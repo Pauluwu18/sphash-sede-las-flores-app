@@ -301,16 +301,29 @@
 /* 4. MODAL / MENÚ DE AYUDA RÁPIDA (al pulsar ❓) */
 .splash-tutor-menu-card {
   position: fixed;
-  bottom: 90px;
-  right: 20px;
-  width: min(92vw, 360px);
+  bottom: 86px;
+  right: 16px;
+  width: min(92vw, 350px);
+  max-width: 350px;
   background: #ffffff;
   border: 2px solid #008c95;
   border-radius: 18px;
-  padding: 18px;
+  padding: 16px;
   box-shadow: 0 16px 40px rgba(16, 42, 67, 0.35);
   z-index: 9998;
-  animation: splashTutorPopIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  box-sizing: border-box;
+  animation: splashTutorCardIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes splashTutorCardIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .splash-tutor-menu-header {
@@ -331,7 +344,7 @@
 
 .splash-tutor-menu-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #102f49;
 }
@@ -364,6 +377,7 @@
   text-align: left;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .splash-tutor-menu-item:hover {
@@ -386,40 +400,56 @@
   margin-top: 4px;
 }
 
-/* 5. MODAL DE BIENVENIDA (Primera vez) */
+/* 5. MODAL DE BIENVENIDA (Primera vez) - Perfectamente centrado en toda pantalla */
 .splash-tutor-welcome-modal {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(92vw, 400px);
+  width: min(88vw, 350px);
+  max-width: 350px;
   background: #ffffff;
   border: 3px solid #008c95;
   border-radius: 22px;
-  padding: 24px;
+  padding: 22px 18px;
   box-shadow: 0 20px 50px rgba(16, 42, 67, 0.45);
   z-index: 9999;
   text-align: center;
-  animation: splashTutorPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  box-sizing: border-box;
+  animation: splashTutorModalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes splashTutorModalIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .splash-tutor-welcome-char {
-  width: 140px;
+  width: 120px;
+  max-width: 45%;
   height: auto;
-  margin: -10px auto 10px auto;
+  margin: -6px auto 10px auto;
   display: block;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.18));
 }
 
 .splash-tutor-welcome-title {
   margin: 0 0 8px 0;
-  font-size: 1.3rem;
+  font-size: 1.18rem;
   font-weight: 800;
   color: #102f49;
+  line-height: 1.3;
 }
 
 .splash-tutor-welcome-desc {
-  margin: 0 0 20px 0;
-  font-size: 0.95rem;
+  margin: 0 0 18px 0;
+  font-size: 0.9rem;
   line-height: 1.45;
   color: #486581;
 }
@@ -428,5 +458,55 @@
   display: flex;
   gap: 10px;
   justify-content: center;
+  width: 100%;
+}
+
+.splash-tutor-welcome-actions button {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+/* 6. RESPONSIVE MOBILE AJUSTES */
+@media (max-width: 480px) {
+  .splash-tutor-stage {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    left: 10px !important;
+    gap: 8px;
+  }
+  .splash-tutor-char-wrap {
+    width: 95px !important;
+  }
+  .splash-tutor-bubble {
+    padding: 12px 14px;
+  }
+  .splash-tutor-title {
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+  .splash-tutor-text {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  .splash-tutor-fab {
+    width: 50px;
+    height: 50px;
+    right: 16px;
+    bottom: 20px;
+  }
+  .splash-tutor-menu-card {
+    right: 10px;
+    left: 10px;
+    width: calc(100vw - 20px);
+    max-width: none;
+    bottom: 78px;
+  }
+  .splash-tutor-welcome-modal {
+    width: calc(100vw - 32px);
+    padding: 20px 16px;
+  }
 }
 
