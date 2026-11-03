@@ -26,6 +26,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Ocultar en la pantalla de login (solo mostrar cuando worker-home está activo) */
+body:has(#worker-home[hidden]) .splash-tutor-fab,
+body:has(#worker-login:not([hidden])) .splash-tutor-fab {
+  display: none !important;
+}
+
 .splash-tutor-fab:hover {
   transform: scale(1.08) translateY(-2px);
   box-shadow: 0 8px 22px rgba(0, 140, 149, 0.42), 0 3px 10px rgba(0, 0, 0, 0.2);

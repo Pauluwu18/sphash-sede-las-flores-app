@@ -103,7 +103,35 @@
 
       this.initDom();
       this.bindEvents();
+      this.syncVisibility();
+      this.observeScreenChanges();
       this.checkFirstTimeVisit();
+    }
+
+    syncVisibility() {
+      const workerHome = document.getElementById('worker-home');
+      const workerLogin = document.getElementById('worker-login');
+      // El botón de ayuda solo debe aparecer en la página de operarios logueado (worker-home visible)
+      // y nunca en el formulario de login (worker-login visible).
+      const isOperariosPage = (workerHome && !workerHome.hidden) || (!workerLogin && workerHome);
+      if (this.fab) {
+        this.fab.style.display = isOperariosPage ? 'flex' : 'none';
+      }
+      if (!isOperariosPage) {
+        if (this.welcomeModal) this.welcomeModal.style.display = 'none';
+        if (this.menuCard) this.menuCard.style.display = 'none';
+        if (this.overlay && !this.isActive) this.overlay.classList.remove('is-active');
+      }
+    }
+
+    observeScreenChanges() {
+      const workerHome = document.getElementById('worker-home');
+      const workerLogin = document.getElementById('worker-login');
+      if (typeof MutationObserver !== 'undefined') {
+        this._observer = new MutationObserver(() => this.syncVisibility());
+        if (workerHome) this._observer.observe(workerHome, { attributes: true, attributeFilter: ['hidden', 'style'] });
+        if (workerLogin) this._observer.observe(workerLogin, { attributes: true, attributeFilter: ['hidden', 'style'] });
+      }
     }
 
     initDom() {
@@ -316,11 +344,13 @@
     }
 
     destroy() {
+      if (this._observer) this._observer.disconnect();
       if (this._welcomeTimer) clearTimeout(this._welcomeTimer);
       this.closeTutor();
     }
 
     openMenu() {
+      if (this.fab) this.fab.style.display = 'flex';
       this.menuCard.style.display = 'block';
       this.overlay.classList.add('is-active');
     }
@@ -330,10 +360,12 @@
       if (!this.isActive) {
         this.overlay.classList.remove('is-active');
       }
+      this.syncVisibility();
     }
 
     startTutorial(fromIndex = 0) {
       this.isActive = true;
+      if (this.fab) this.fab.style.display = 'flex';
       this.overlay.classList.add('is-active');
       this.spotlight.classList.add('is-active');
       this.stage.style.display = 'flex';

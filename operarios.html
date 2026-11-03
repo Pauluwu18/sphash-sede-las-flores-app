@@ -16,9 +16,9 @@
       <p class="login-kicker">Acceso de operarios</p><h1>SPLASH SEDE LAS FLORES</h1>
       <p class="login-subtitle" id="worker-intro">Ingresa con tu DNI y tu PIN personal.</p>
       <label class="worker-label" for="worker-dni">DNI</label>
-      <input id="worker-dni" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="username" placeholder="Tu DNI de 8 dígitos" required>
+      <input id="worker-dni" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Tu DNI de 8 dígitos" required>
       <label class="worker-label" for="worker-pin">PIN de 4 dígitos</label>
-      <input id="worker-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" placeholder="Tu PIN (si ya lo creaste)">
+      <input id="worker-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="Tu PIN (si ya lo creaste)">
       <div id="pin-confirm-wrap" hidden><label class="worker-label" for="worker-pin-confirm">Repite tu nuevo PIN</label><input id="worker-pin-confirm" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="Confirma tu PIN"></div>
       <button class="login-button" id="worker-submit" type="submit">Iniciar sesión</button>
       <p class="login-message" id="worker-login-message" role="status"></p>
@@ -241,6 +241,18 @@
     <!-- PANEL DE ESCANEO QR -->
     <section class="worker-panel" id="checkin-panel" hidden aria-labelledby="checkin-title">
       <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Escanear QR</h2>
+      <div id="checkin-current-user-wrap" style="background:#eef7f9;border:1.5px solid #008c95;border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.25rem">👤</span>
+          <div>
+            <span style="font-size:0.75rem;color:#627d8d;display:block;text-transform:uppercase;font-weight:700">Registrando asistencia para:</span>
+            <strong id="checkin-operator-name" style="color:#102f49;font-size:1.05rem">—</strong>
+          </div>
+        </div>
+        <button type="button" id="checkin-switch-user-btn" class="secondary-action" style="font-size:0.8rem;padding:6px 10px;white-space:nowrap;color:#e74c3c;border-color:#f5c6cb;background:#fff;cursor:pointer">
+          ¿No eres tú? Cambiar
+        </button>
+      </div>
       <ol class="scan-steps" aria-label="Pasos para registrar"><li id="scan-step-camera" aria-current="step">1. Abre la cámara</li><li id="scan-step-code">2. Apunta al QR</li><li id="scan-step-confirm">3. Registro automático</li></ol>
       <p class="scanner-intro">Encuadra el QR de la base. Tu asistencia se registra automáticamente: espera el aviso «Registrado».</p>
       <div class="scanner-viewport" id="scanner-viewport" data-state="idle">

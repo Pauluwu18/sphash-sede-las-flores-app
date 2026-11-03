@@ -172,6 +172,7 @@ window.AdminQR = {
   window.addEventListener('pagehide', stopWatching);
   setInterval(() => { if (qrEnabled && loginScreen.hidden && peopleDialog.open && !$('profile-dialog').open) AdminQR.refresh().catch(error => showToast(error.message)); }, 3000);
   async function restoreAdminSession() {
+    if (/Android/i.test(navigator.userAgent) && !window.SplashAdminNative) return;
     const token = Splash.adminSession();
     if (!token) return;
     $('keep-session').checked = !!(localStorage.getItem('splash-admin-session') || localStorage.getItem('splash-admin-persist'));

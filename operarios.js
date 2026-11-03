@@ -92,6 +92,7 @@
 
   function showCheckin() {
     if ($('checkin-panel')) $('checkin-panel').hidden = false;
+    if ($('checkin-operator-name') && currentWorker?.name) $('checkin-operator-name').textContent = currentWorker.name;
     if ($('history-panel')) $('history-panel').hidden = true;
     if ($('service-report-panel')) $('service-report-panel').hidden = true;
     if ($('confirm-checkin')) $('confirm-checkin').hidden = true;
@@ -144,6 +145,8 @@
     if ($('worker-name')) $('worker-name').textContent = `Hola, ${me.name}`;
     if ($('worker-login')) $('worker-login').hidden = true;
     if ($('worker-home')) $('worker-home').hidden = false;
+    if ($('checkin-operator-name')) $('checkin-operator-name').textContent = me.name;
+    if (window.splashTutor?.syncVisibility) window.splashTutor.syncVisibility();
     if ($('worker-pin')) $('worker-pin').value = '';
     if ($('worker-pin-confirm')) $('worker-pin-confirm').value = '';
     activating = false;
@@ -371,7 +374,7 @@
       $('confirm-checkin').hidden = true;
       $('start-camera').hidden = true;
       $('attendance-result-title').textContent = result.already ? 'Ya registrada' : 'Registrado';
-      $('attendance-result-message').textContent = result.already ? 'Tu asistencia de hoy ya estaba registrada. No se creó un duplicado.' : 'Tu llegada se guardó correctamente. Ya puedes continuar.';
+      $('attendance-result-message').textContent = result.already ? `Tu asistencia de hoy ya estaba registrada como ${currentWorker?.name || 'tu usuario'}. No se creó un duplicado.` : `¡Listo, ${currentWorker?.name || ''}! Tu llegada se guardó correctamente en la lista de hoy.`;
       if (!$('attendance-result').open) $('attendance-result').showModal();
       if (!result.already) ringBell();
     } catch (error) {
@@ -975,9 +978,12 @@
     try { await Splash.call('logout', {}, 'worker'); } catch { /* La sesión local se elimina igualmente. */ }
     sessionStorage.removeItem('splash-worker-session');
     localStorage.removeItem('splash-worker-session');
+    currentWorker = null;
+    if (window.splashTutor?.syncVisibility) window.splashTutor.syncVisibility();
     location.replace('operarios.html');
   }
   if ($('worker-logout')) $('worker-logout').addEventListener('click', logout);
+  if ($('checkin-switch-user-btn')) $('checkin-switch-user-btn').addEventListener('click', logout);
   window.addEventListener('splash-session-expired', event => {
     if (event.detail !== 'worker') return;
     stopCamera();

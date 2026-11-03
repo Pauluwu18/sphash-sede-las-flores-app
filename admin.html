@@ -49,6 +49,41 @@
       </div>
       <a class="portal-link" href="operarios.html">Soy operario ? Acceder con DNI</a>
     </form>
+    <div class="login-card" id="admin-android-blocked-screen" style="display:none; text-align:center; max-width:440px;" aria-labelledby="blocked-title">
+      <div class="login-mark" style="background:#fee2e2; color:#ef4444; width:64px; height:64px; margin:0 auto 16px; border-radius:50%; display:flex; align-items:center; justify-content:center;" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <p class="login-kicker" style="color:#ef4444; font-weight:700; margin:0 0 6px; letter-spacing:0.05em;">ACCESO RESTRINGIDO</p>
+      <h1 id="blocked-title" style="font-size:1.4rem; margin:0 0 12px; color:#102a43; font-weight:700;">Panel Administrativo Bloqueado en Móvil</h1>
+      <p class="login-subtitle" style="font-size:0.92rem; color:#486581; line-height:1.5; margin:0 0 18px;">
+        Por seguridad, el acceso administrativo está bloqueado en navegadores web de teléfonos Android.
+      </p>
+      <div style="background:#f0f4f8; border-radius:12px; padding:14px; text-align:left; margin-bottom:18px; border:1px solid #d9e2ec; font-size:0.88rem; color:#334e68; line-height:1.5;">
+        <p style="margin:0 0 8px; font-weight:700; color:#102a43;">¿Cómo acceder a la administración?</p>
+        <p style="margin:0 0 8px;">💻 <strong>Desde Computadora (PC / Laptop):</strong> Ingresa a este mismo enlace web desde cualquier PC.</p>
+        <p style="margin:0;">📱 <strong>En Android:</strong> Abre la aplicación instalada oficial <strong>SPLASH Admin</strong>.</p>
+      </div>
+      <a class="primary-button" href="operarios.html" style="display:block; text-align:center; padding:12px 18px; text-decoration:none; font-weight:700; border-radius:10px; background:#008c95; color:#fff; box-shadow:0 2px 8px rgba(0,140,149,0.3); font-size:0.95rem;">
+        Ir al Portal de Operarios
+      </a>
+    </div>
+    <script>
+      (function() {
+        try {
+          var isAndroid = /Android/i.test(navigator.userAgent);
+          var isNativeAdmin = typeof window.SplashAdminNative !== 'undefined';
+          if (isAndroid && !isNativeAdmin) {
+            var lf = document.getElementById('login-form');
+            var bs = document.getElementById('admin-android-blocked-screen');
+            if (lf) lf.style.setProperty('display', 'none', 'important');
+            if (bs) bs.style.setProperty('display', 'block', 'important');
+          }
+        } catch (_) {}
+      })();
+    </script>
   </div>
   <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="navigation-drawer" aria-label="Abrir menú de navegación">
     <span aria-hidden="true">&#9776;</span>

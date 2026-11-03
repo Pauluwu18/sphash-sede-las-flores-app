@@ -120,6 +120,10 @@ passwordToggle.addEventListener("click", () => {
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (/Android/i.test(navigator.userAgent) && !window.SplashAdminNative) {
+    loginMessage.textContent = "El acceso administrativo está bloqueado en navegadores web de Android. Usa la APK de Administración.";
+    return;
+  }
   const username = document.querySelector("#login-user").value.trim();
   const password = document.querySelector("#login-password").value;
   const submit = loginForm.querySelector('[type="submit"]');
