@@ -41,6 +41,12 @@
       <p id="keep-session-help" class="keep-session-help">Entrar automáticamente en este dispositivo durante 30 días.</p>
       <button class="login-button" type="submit">Iniciar sesión</button>
       <p class="login-message" id="login-message" role="alert" aria-live="polite"></p>
+      <div style="margin-top:14px;padding:12px;background:#eef6f8;border-radius:12px;text-align:center;border:1px solid #d0e7eb">
+        <small style="color:#008c95;font-weight:700;display:block">¿Usas la app en tu teléfono Android?</small>
+        <button type="button" class="secondary-action" id="admin-login-download-apk" style="margin-top:8px;width:100%;font-size:0.85rem;font-weight:600">
+          📥 Descargar APK de Administración
+        </button>
+      </div>
       <a class="portal-link" href="operarios.html">Soy operario ? Acceder con DNI</a>
     </form>
   </div>
@@ -71,6 +77,9 @@
       <button class="navigation-action" id="cash-reports-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
         <span><strong>Reportes de caja</strong><small>Tomar foto de billete y reportar</small></span>
       </button>
+      <button class="navigation-action" id="apk-manager-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+        <span><strong>Versiones y APK</strong><small>Publicar actualizaciones en Supabase</small></span>
+      </button>
       <button class="navigation-action" id="inventory-tab" type="button" aria-expanded="false" aria-controls="inventory-drawer"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 6a5 5 0 0 0-6 6l-5 5a3 3 0 0 0 4 4l5-5a5 5 0 0 0 6-6l-3 3-4-4z"/></svg></span>
         <span><strong>Herramientas</strong><small>Consultar préstamos y devoluciones</small></span>
       </button>
@@ -88,6 +97,23 @@
   </aside>
   <main class="shell">
     <div class="welcome-message" id="welcome-message" role="status" aria-live="polite">BIENVENIDO</div>
+    <div id="admin-update-banner" hidden style="background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:12px 18px;border-radius:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.4rem">🔔</span>
+        <div>
+          <strong id="admin-update-banner-title">¡Nueva versión disponible de la App!</strong>
+          <p id="admin-update-banner-desc" style="margin:2px 0 0;font-size:0.85rem">Hay actualizaciones disponibles para descargar e instalar.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="admin-update-banner-btn" class="primary-button" style="padding:8px 16px;font-size:0.85rem;white-space:nowrap;background:#008c95;border-color:#00757d">
+          📥 Descargar APK
+        </button>
+        <button type="button" id="admin-update-banner-manage" class="secondary-action" style="padding:8px 14px;font-size:0.85rem;white-space:nowrap">
+          Gestionar versiones
+        </button>
+      </div>
+    </div>
     <header class="topbar">
       <div>
         <p class="eyebrow">SPLASH SEDE LAS FLORES</p>
@@ -519,6 +545,59 @@
     <div class="dialog-heading"><h2 id="qr-title">QR de asistencia</h2><button class="dialog-close" id="qr-close" aria-label="Cerrar QR">&times;</button></div>
     <div class="qr-poster"><h3>SPLASH SEDE LAS FLORES</h3><div id="base-qr"></div><h3>Registra tu asistencia</h3><p>Escanea e ingresa con tu DNI y PIN.</p></div>
     <p id="qr-message" role="status"></p><div class="qr-actions"><button class="secondary-action" id="qr-print" disabled>Imprimir</button><button class="secondary-action" id="qr-download" disabled>Descargar imagen</button><button class="secondary-action" id="qr-rotate">Reemplazar QR</button></div>
+  </dialog>
+  <dialog class="cash-reports-dialog" id="apk-manager-dialog" aria-labelledby="apk-manager-title" style="max-width:680px">
+    <div class="dialog-heading">
+      <div>
+        <p class="section-kicker">Actualizaciones móviles</p>
+        <h2 id="apk-manager-title">Gestión de Versiones de la App (APK)</h2>
+      </div>
+      <button class="dialog-close" id="apk-manager-close" type="button" aria-label="Cerrar gestión de versiones">&times;</button>
+    </div>
+    <p class="movements-subtitle">Publica los datos de las nuevas versiones de APK a Supabase para que los operarios y administradores se actualicen desde su app.</p>
+
+    <form id="apk-version-form" style="background:#f7fafb;padding:18px;border-radius:14px;border:1px solid #dce9ec;margin-bottom:20px">
+      <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;color:#102f49">Publicar nueva versión de APK</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="field-label" for="apk-app-name">Aplicación</label>
+          <select id="apk-app-name" class="history-calendar" style="width:100%;height:44px">
+            <option value="operarios">Operarios (SPLASH SEDE LAS FLORES)</option>
+            <option value="admin">Administración (SPLASH Admin)</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="apk-version-name">Nombre de versión (ej. 1.1 o 1.5)</label>
+          <input type="text" id="apk-version-name" class="history-calendar" placeholder="1.1" required style="width:100%;height:44px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-top:10px">
+        <div>
+          <label class="field-label" for="apk-version-code">Código de versión (número)</label>
+          <input type="number" id="apk-version-code" class="history-calendar" placeholder="2" required style="width:100%;height:44px">
+        </div>
+        <div>
+          <label class="field-label" for="apk-url-input">Enlace de descarga directa del APK</label>
+          <input type="url" id="apk-url-input" class="history-calendar" placeholder="https://github.com/.../app.apk o enlace directo" required style="width:100%;height:44px">
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label class="field-label" for="apk-changelog">Novedades y mejoras de esta versión</label>
+        <textarea id="apk-changelog" class="history-calendar" style="width:100%;height:64px;padding:8px" placeholder="Ej: Reporte de servicios con fotos para WhatsApp y caja, selector de pago y actualizador."></textarea>
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end">
+        <button type="submit" class="save-button" id="apk-publish-btn" style="min-width:180px">
+          🚀 Publicar en Supabase
+        </button>
+      </div>
+      <p id="apk-form-message" role="status" style="margin-top:8px;font-size:0.85rem;color:#008c95"></p>
+    </form>
+
+    <div class="movements-header" style="margin-top:10px">
+      <h3>Versiones registradas en Supabase</h3>
+      <button type="button" class="secondary-action" id="apk-refresh-btn" style="padding:6px 12px;font-size:0.85rem">Actualizar lista</button>
+    </div>
+    <div id="apk-versions-list" style="margin-top:12px;display:grid;gap:10px;max-height:260px;overflow-y:auto"></div>
   </dialog>
   <script src="vendor/supabase.js"></script><script src="splash-api.js?v=20261004-admin"></script>
   <script src="vendor/qrcode.min.js"></script>

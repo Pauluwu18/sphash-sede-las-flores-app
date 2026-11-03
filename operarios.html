@@ -6,7 +6,7 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=auto-checkin-6"><link rel="stylesheet" href="qr-attendance.css?v=auto-checkin-6">
+  <link rel="stylesheet" href="styles.css?v=auto-checkin-7"><link rel="stylesheet" href="qr-attendance.css?v=auto-checkin-7">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -22,17 +22,209 @@
       <button class="login-button" id="worker-submit" type="submit">Iniciar sesión</button>
       <p class="login-message" id="worker-login-message" role="status"></p>
       <p class="worker-help">¿Primera vez? Tu administrador debe registrar tu DNI. Crea tu PIN personal desde la app.</p>
+      <div style="margin-top:14px;padding:12px;background:#eef6f8;border-radius:12px;text-align:center;border:1px solid #d0e7eb">
+        <small style="color:#008c95;font-weight:700;display:block">¿Tienes una versión antigua o necesitas la app?</small>
+        <button type="button" class="secondary-action" id="login-download-apk-btn" style="margin-top:8px;width:100%;font-size:0.85rem;font-weight:600">
+          📥 Descargar APK (Actualización)
+        </button>
+      </div>
       <a class="portal-link" href="admin.html">Entrar como administrador</a>
     </form>
   </div>
   <main class="worker-shell" id="worker-home" hidden>
-    <header class="worker-header"><div><p class="login-kicker">SPLASH SEDE LAS FLORES</p><h1 id="worker-name">Mi asistencia</h1></div><button class="secondary-action" id="worker-logout">Cerrar sesión</button></header>
+    <div id="worker-update-banner" hidden style="background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:12px 16px;border-radius:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <strong id="worker-update-banner-title">🔔 ¡Nueva versión disponible!</strong>
+        <p id="worker-update-banner-desc" style="margin:2px 0 0;font-size:0.85rem">Actualiza la aplicación para tener los reportes de servicios y WhatsApp integrados.</p>
+      </div>
+      <button type="button" id="worker-update-banner-btn" class="primary-button" style="padding:8px 16px;font-size:0.85rem;white-space:nowrap;background:#d97706;border-color:#b45309">
+        Actualizar ahora
+      </button>
+    </div>
+    <header class="worker-header">
+      <div>
+        <p class="login-kicker">SPLASH SEDE LAS FLORES</p>
+        <h1 id="worker-name">Mi asistencia</h1>
+      </div>
+      <div class="worker-header-actions" style="display:flex;gap:8px;align-items:center">
+        <button class="secondary-action" id="header-update-btn" type="button" title="Verificar actualizaciones" style="font-size:0.85rem;padding:8px 12px">
+          🔄 Actualizar app
+        </button>
+        <button class="secondary-action" id="worker-logout">Cerrar sesión</button>
+      </div>
+    </header>
     <p id="worker-menu-hint" class="worker-help">Elige una opción para continuar.</p>
-    <a id="worker-back" class="secondary-action" href="operarios.html" hidden>Volver al menú</a>
+    <a id="worker-back" class="secondary-action" href="operarios.html" hidden>← Volver al menú</a>
+    
     <nav class="worker-menu" id="worker-menu" aria-label="Menú de operario">
-      <button class="worker-menu-card" id="open-checkin" type="button"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path d="M8 8h3v3H8zm6 0h2v3h-2zm-6 6h3v2H8zm6 0h2v2h-2z"/></svg><strong>Escanear QR</strong><span>Escanea el QR físico de la base.</span></button>
-      <button class="worker-menu-card" id="open-history" type="button"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 3 3 5-5"/></svg><strong>Mis asistencias</strong><span>Consulta tus fechas y horas de llegada.</span></button>
+      <button class="worker-menu-card" id="open-service-report" type="button">
+        <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <line x1="2" y1="10" x2="22" y2="10"/>
+          <path d="M7 15h.01M17 15h.01"/>
+        </svg>
+        <strong>Reportar servicio</strong>
+        <span>Foto del dinero, número de servicio y enviar al grupo de WhatsApp y a caja.</span>
+      </button>
+
+      <button class="worker-menu-card" id="open-checkin" type="button">
+        <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>
+          <path d="M8 8h3v3H8zm6 0h2v3h-2zm-6 6h3v2H8zm6 0h2v2h-2z"/>
+        </svg>
+        <strong>Escanear QR</strong>
+        <span>Escanea el QR físico de la base para tu asistencia.</span>
+      </button>
+
+      <button class="worker-menu-card" id="open-history" type="button">
+        <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <rect x="4" y="5" width="16" height="16" rx="3"/>
+          <path d="M8 3v4m8-4v4M4 11h16m-12 5 3 3 5-5"/>
+        </svg>
+        <strong>Mis asistencias</strong>
+        <span>Consulta tus fechas y horas de llegada registradas.</span>
+      </button>
+
+      <button class="worker-menu-card" id="open-updater" type="button">
+        <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <strong>Actualizar app</strong>
+        <span id="updater-menu-subtitle">Verifica y descarga la versión más reciente del APK.</span>
+      </button>
     </nav>
+
+    <!-- PANEL DE REPORTE DE SERVICIOS PARA OPERARIOS -->
+    <section class="worker-panel" id="service-report-panel" hidden aria-labelledby="service-report-title">
+      <p class="section-kicker">Caja y WhatsApp</p>
+      <h2 id="service-report-title">Reportar servicio</h2>
+      <p>Completa los datos del servicio realizado. Se guardará en la caja de administración y se enviará con foto al grupo de WhatsApp.</p>
+
+      <form id="sr-form" onsubmit="return false;">
+        <!-- OPERARIO -->
+        <div class="sr-field-group">
+          <div class="sr-operator-bar">
+            <span>Operario:</span>
+            <strong id="sr-operator-display">—</strong>
+            <button type="button" class="sr-text-btn" id="sr-toggle-op-btn">Cambiar</button>
+          </div>
+          <div id="sr-operator-custom-wrap" hidden style="margin-top:8px">
+            <input type="text" id="sr-operator-input" class="worker-input" placeholder="Nombre del operario (ej. Yerson)">
+          </div>
+        </div>
+
+        <!-- NUMERO DE SERVICIO (1er al 7mo facil) -->
+        <div class="sr-field-group">
+          <label class="worker-label" for="sr-service-input">Número de servicio</label>
+          <div class="sr-pills" id="sr-service-pills">
+            <button type="button" class="sr-pill" data-service="Primer servicio">1er Servicio</button>
+            <button type="button" class="sr-pill" data-service="Segundo servicio">2do Servicio</button>
+            <button type="button" class="sr-pill" data-service="Tercer servicio">3er Servicio</button>
+            <button type="button" class="sr-pill" data-service="Cuarto servicio">4to Servicio</button>
+            <button type="button" class="sr-pill" data-service="Quinto servicio">5to Servicio</button>
+            <button type="button" class="sr-pill" data-service="Sexto servicio">6to Servicio</button>
+            <button type="button" class="sr-pill" data-service="Séptimo servicio">7mo Servicio</button>
+          </div>
+          <input type="text" id="sr-service-input" class="worker-input" placeholder="Ej: Cuarto servicio" required value="Primer servicio">
+        </div>
+
+        <!-- MONTO DEL SERVICIO -->
+        <div class="sr-field-group">
+          <label class="worker-label" for="sr-amount-input">Monto del servicio (S/)</label>
+          <div class="sr-pills" id="sr-amount-pills">
+            <button type="button" class="sr-pill" data-amount="100">S/ 100</button>
+            <button type="button" class="sr-pill" data-amount="120">S/ 120</button>
+            <button type="button" class="sr-pill" data-amount="130">S/ 130</button>
+            <button type="button" class="sr-pill" data-amount="150">S/ 150</button>
+            <button type="button" class="sr-pill" data-amount="200">S/ 200</button>
+          </div>
+          <div class="sr-input-with-prefix">
+            <span class="sr-prefix">S/</span>
+            <input type="number" step="any" min="0.01" id="sr-amount-input" class="worker-input" placeholder="150" required>
+          </div>
+        </div>
+
+        <!-- METODO DE PAGO -->
+        <div class="sr-field-group">
+          <label class="worker-label">Método de pago</label>
+          <div class="sr-payment-methods" id="sr-payment-methods">
+            <label class="sr-payment-option is-active">
+              <input type="radio" name="sr-payment" value="Yape" checked class="visually-hidden">
+              <span class="sr-pay-icon" style="background:#00d1b2">🟢</span>
+              <span>Yape</span>
+            </label>
+            <label class="sr-payment-option">
+              <input type="radio" name="sr-payment" value="Plin" class="visually-hidden">
+              <span class="sr-pay-icon" style="background:#9b51e0">🟣</span>
+              <span>Plin</span>
+            </label>
+            <label class="sr-payment-option">
+              <input type="radio" name="sr-payment" value="Tarjeta" class="visually-hidden">
+              <span class="sr-pay-icon" style="background:#2f80ed">💳</span>
+              <span>Tarjeta</span>
+            </label>
+            <label class="sr-payment-option">
+              <input type="radio" name="sr-payment" value="Efectivo" class="visually-hidden">
+              <span class="sr-pay-icon" style="background:#27ae60">💵</span>
+              <span>Efectivo</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- FOTO DEL DINERO / COMPROBANTE -->
+        <div class="sr-field-group">
+          <label class="worker-label">Foto del billete / dinero o comprobante</label>
+          <div class="sr-photo-actions" id="sr-photo-actions">
+            <button type="button" class="secondary-action" id="sr-open-camera-btn">📷 Abrir cámara</button>
+            <label class="secondary-action" for="sr-photo-file" style="cursor:pointer;margin:0">📁 Subir foto</label>
+            <input type="file" id="sr-photo-file" accept="image/*" capture="environment" class="visually-hidden">
+          </div>
+
+          <!-- Cámara en vivo -->
+          <div id="sr-camera-live-wrap" hidden style="margin-top:12px">
+            <video id="sr-camera-video" playsinline muted style="width:100%;max-height:280px;border-radius:14px;background:#102f49;object-fit:cover;display:block"></video>
+            <div style="display:flex;gap:10px;margin-top:10px">
+              <button type="button" class="primary-button" id="sr-capture-photo-btn" style="flex:1">📸 Capturar foto</button>
+              <button type="button" class="secondary-action" id="sr-close-camera-btn">Cerrar</button>
+            </div>
+          </div>
+
+          <!-- Vista previa de foto -->
+          <div id="sr-photo-preview-wrap" hidden style="margin-top:12px">
+            <img id="sr-photo-preview-img" alt="Foto del dinero" style="width:100%;max-height:220px;border-radius:14px;object-fit:cover;border:2px solid #008c95;display:block">
+            <button type="button" class="secondary-action" id="sr-remove-photo-btn" style="margin-top:8px;width:100%">🗑️ Quitar foto</button>
+          </div>
+        </div>
+
+        <!-- OBSERVACION OPCIONAL -->
+        <div class="sr-field-group">
+          <label class="worker-label" for="sr-observation-input">Observación opcional</label>
+          <input type="text" id="sr-observation-input" class="worker-input" placeholder="Ej: se dio vuelto en yape">
+          <small class="worker-help" style="margin-top:4px;display:block">Si escribes una observación, se colocará automáticamente entre paréntesis al final.</small>
+        </div>
+
+        <!-- VISTA PREVIA PARA WHATSAPP -->
+        <div class="sr-field-group">
+          <label class="worker-label">Mensaje para el grupo SPHASH SEDE LAS FLORES</label>
+          <pre class="sr-preview-box" id="sr-preview-text" aria-label="Vista previa del reporte"></pre>
+        </div>
+
+        <!-- BOTONES DE ACCION -->
+        <div class="sr-submit-actions">
+          <button type="button" id="sr-submit-whatsapp" class="primary-button whatsapp-button" style="background:#25D366;color:#fff;border-color:#1EBE5D;display:flex;align-items:center;justify-content:center;gap:10px;font-size:1rem;font-weight:700;width:100%">
+            <span>📲 Mandar al grupo SPHASH SEDE LAS FLORES</span>
+          </button>
+          <button type="button" id="sr-save-only" class="secondary-action" style="margin-top:10px;width:100%">
+            Guardar solo en caja de administración
+          </button>
+        </div>
+        <p id="sr-message" class="scan-status" role="status" aria-live="polite" style="margin-top:12px"></p>
+      </form>
+    </section>
+
+    <!-- PANEL DE ESCANEO QR -->
     <section class="worker-panel" id="checkin-panel" hidden aria-labelledby="checkin-title">
       <p class="section-kicker">Registro en la base</p><h2 id="checkin-title">Escanear QR</h2>
       <ol class="scan-steps" aria-label="Pasos para registrar"><li id="scan-step-camera" aria-current="step">1. Abre la cámara</li><li id="scan-step-code">2. Apunta al QR</li><li id="scan-step-confirm">3. Registro automático</li></ol>
@@ -51,6 +243,8 @@
       <div class="scanner-alternatives"><label class="secondary-action photo-qr-button" for="qr-photo">Tomar foto del QR</label><input id="qr-photo" type="file" accept="image/*" capture="environment" class="visually-hidden"><p class="worker-help">Si no abre la cámara en vivo, toma una foto nítida del QR. La imagen se procesa en tu teléfono.</p></div>
       <details class="camera-help" id="camera-help"><summary>¿La cámara no abre?</summary><ol><li>Permite la cámara para este sitio desde los permisos del navegador.</li><li>Si usas la app instalada, revisa también el permiso de cámara de la app en los ajustes del teléfono.</li><li>Si sigue bloqueada, abre este enlace en Chrome o Safari, o usa «Tomar foto del QR».</li></ol><button class="secondary-action" id="copy-scanner-link" type="button">Copiar enlace del escáner</button><input id="scanner-link" readonly aria-label="Enlace del escáner para copiar" hidden><p id="scanner-link-message" role="status"></p></details>
     </section>
+
+    <!-- PANEL DE HISTORIAL -->
     <section class="worker-panel" id="history-panel" hidden aria-labelledby="worker-history-title">
       <p class="section-kicker">Tu historial personal</p><h2 id="worker-history-title">Mis asistencias</h2>
       <p>Consulta cuándo llegaste y a qué hora. Las más recientes aparecen primero.</p>
@@ -59,12 +253,54 @@
       <p id="worker-history-message" role="status" aria-live="polite"></p><div id="worker-history"></div>
     </section>
   </main>
+
+  <!-- MODAL DE RESULTADO DE ASISTENCIA -->
   <dialog class="attendance-result" id="attendance-result" aria-labelledby="attendance-result-title" aria-describedby="attendance-result-message">
     <div class="attendance-result-icon" aria-hidden="true"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4 4L19 6"/></svg></div>
     <h2 id="attendance-result-title">Registrado</h2>
     <p id="attendance-result-message"></p>
     <button class="primary-button" id="attendance-result-close" type="button" autofocus>Entendido</button>
   </dialog>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=auto-checkin-6"></script><script src="vendor/jsQR.js"></script><script src="operarios.js?v=auto-checkin-6"></script>
+
+  <!-- MODAL DE ACTUALIZACION DE LA APP -->
+  <dialog class="qr-dialog" id="app-updater-dialog" aria-labelledby="updater-dialog-title">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 id="updater-dialog-title" style="margin:0">Actualización de la App</h2>
+      <button type="button" id="updater-dialog-close" class="secondary-action" style="padding:6px 12px;margin:0">&times;</button>
+    </div>
+    <p style="margin:0 0 16px;color:#627d8d;font-size:0.9rem">Consulta y descarga la versión más reciente del APK de operarios.</p>
+    <div style="padding:14px;border-radius:12px;background:#eef6f8;margin-bottom:16px">
+      <p style="margin:0;font-size:0.9rem">Versión instalada: <strong id="updater-cur-ver">v1.1</strong></p>
+    </div>
+    <p id="updater-status-text" class="scan-status" role="status">Buscando actualizaciones en Supabase…</p>
+    <div id="updater-available-wrap" hidden style="margin-top:16px">
+      <div style="padding:16px;border-radius:14px;border:2px solid #008c95;background:#f0fafb;margin-bottom:16px">
+        <span style="display:inline-block;padding:4px 10px;border-radius:100px;background:#008c95;color:#fff;font-size:0.75rem;font-weight:700">NUEVA VERSIÓN</span>
+        <h3 id="updater-new-ver-title" style="margin:8px 0 6px;color:#102f49">v1.1</h3>
+        <p id="updater-changelog-text" style="margin:0 0 12px;color:#627d8d;font-size:0.88rem"></p>
+        <button type="button" class="primary-button" id="updater-download-btn" style="width:100%">
+          ⬇️ Descargar e instalar actualización
+        </button>
+      </div>
+    </div>
+    <div id="updater-up-to-date-wrap" hidden style="margin-top:12px">
+      <div style="padding:14px;border-radius:12px;background:#dff5ed;color:#155a43;font-weight:600;text-align:center">
+        ✅ Tu app está actualizada a la última versión.
+      </div>
+      <button type="button" class="secondary-action" id="updater-redownload-btn" style="margin-top:10px;width:100%;font-size:0.88rem">
+        📥 Descargar archivo APK nuevamente
+      </button>
+    </div>
+    <div style="margin-top:18px;border-top:1px solid #dce9ec;padding-top:12px;text-align:center">
+      <a id="updater-direct-link" href="https://pauluwu18.github.io/sphash-sede-las-flores-app/SPLASH-Operarios.apk" target="_blank" rel="noopener noreferrer" style="font-size:0.85rem;color:#008c95;text-decoration:underline">
+        🔗 Enlace de descarga directa del APK
+      </a>
+    </div>
+  </dialog>
+
+  <script src="vendor/supabase.js"></script>
+  <script src="splash-api.js?v=auto-checkin-7"></script>
+  <script src="vendor/jsQR.js"></script>
+  <script src="operarios.js?v=auto-checkin-7"></script>
 </body>
 </html>

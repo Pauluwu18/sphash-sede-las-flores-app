@@ -1307,6 +1307,46 @@ function saveMovementsForDate(date, movements) {
   saveCashRecordsStore(store);
 }
 
+async function fetchCashMovementsFromSupabase(date) {
+  if (!date) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cash_movements?date=eq.${encodeURIComponent(date)}&order=created_at.asc`, {
+      headers: supabaseHeaders()
+    });
+    if (res.ok) {
+      const remote = await res.json();
+      if (Array.isArray(remote)) {
+        const store = getCashRecordsStore();
+        const local = store[date] || [];
+        const map = new Map();
+        local.forEach((m) => { if (m && m.id) map.set(m.id, m); });
+        remote.forEach((r) => {
+          if (!r || !r.id) return;
+          const existing = map.get(r.id) || {};
+          map.set(r.id, {
+            id: r.id,
+            date: r.date || date,
+            type: r.type || 'ENTRADA',
+            amount: Number(r.amount) || 0,
+            operator: r.operator || '',
+            service_number: r.service_number || '',
+            payment_method: r.payment_method || 'Efectivo',
+            observation: r.observation || '',
+            concept: r.concept || '',
+            photo: r.photo || existing.photo || '',
+            time: r.time || '',
+            timestamp: r.created_at ? new Date(r.created_at).getTime() : (existing.timestamp || Date.now())
+          });
+        });
+        store[date] = Array.from(map.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        saveCashRecordsStore(store);
+      }
+    }
+  } catch (err) {
+    console.warn("No se pudo sincronizar movimientos de caja con Supabase:", err);
+  }
+}
+
 function formatMontoExact(num) {
   const n = Number(num) || 0;
   return n % 1 === 0 ? String(n) : n.toFixed(2);
@@ -1318,6 +1358,15 @@ function formatMontoDisplay(num) {
 }
 
 function formatCashMovement(m) {
+  if (m.service_number) {
+    const montoStr = formatMontoExact(m.amount);
+    const op = (m.operator || '').trim();
+    const payMethod = m.payment_method || 'Efectivo';
+    const obs = m.observation ? `\n(${m.observation})` : '';
+    let res = `${m.service_number}\nOPERARIO: ${op || 'Sin asignar'}\nMONTO DEL SERVICIO: ${montoStr}\nMETODO: ${payMethod}${obs}`;
+    return res;
+  }
+
   const montoStr = formatMontoExact(m.amount);
   const op = (m.operator || '').trim();
   const concept = (m.concept || '').trim();
@@ -1617,10 +1666,12 @@ function renderCashDialog() {
         const lines = formatted.split('\n');
         const line1 = lines[0] || '';
         const line2 = lines.slice(1).join(' ') || '';
+        const payBadge = m.payment_method ? `<span class="cash-movement-badge" style="background:#e0f2fe;color:#0284c7;font-weight:600">${escapeHtml(m.payment_method)}</span>` : '';
         return `
           <div class="cash-movement-item">
             ${m.photo ? `<img class="cash-movement-thumb" src="${m.photo}" alt="Foto billete" data-cash-view-photo="${idx}" title="Ver foto del billete">` : ''}
             <span class="cash-movement-badge ${isIncome ? 'income' : 'expense'}">${m.type}</span>
+            ${payBadge}
             <div class="cash-movement-info">
               <span class="cash-movement-line1">${escapeHtml(line1)}</span>
               ${line2 ? `<span class="cash-movement-line2">${escapeHtml(line2)}</span>` : ''}
@@ -1639,7 +1690,7 @@ function renderCashDialog() {
   renderCashQuickOperators();
 }
 
-function openCashReports() {
+async function openCashReports() {
   closeNavigation();
   activeCashDate = getDate();
   if ("Notification" in window && Notification.permission === "default") {
@@ -1652,6 +1703,11 @@ function openCashReports() {
   renderCashConceptPills(selectedType);
   renderCashDialog();
   if (cashReportsDialog) cashReportsDialog.showModal();
+
+  try {
+    await fetchCashMovementsFromSupabase(activeCashDate);
+    renderCashDialog();
+  } catch (_) {}
 }
 
 async function processAndSaveMovement(andShareToWhatsapp = false) {
@@ -1678,6 +1734,9 @@ async function processAndSaveMovement(andShareToWhatsapp = false) {
     amount,
     operator,
     concept,
+    service_number: '',
+    payment_method: 'Efectivo',
+    observation: '',
     photo: currentCashPhotoData || '',
     time,
     timestamp: Date.now()
@@ -1686,6 +1745,29 @@ async function processAndSaveMovement(andShareToWhatsapp = false) {
   const movements = getMovementsForDate(date);
   movements.push(movement);
   saveMovementsForDate(date, movements);
+
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/cash_movements`, {
+      method: 'POST',
+      headers: supabaseHeaders({
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      }),
+      body: JSON.stringify({
+        id: movement.id,
+        date: date,
+        type: movement.type,
+        amount: movement.amount,
+        operator: movement.operator,
+        concept: movement.concept,
+        service_number: movement.service_number,
+        payment_method: movement.payment_method,
+        observation: movement.observation,
+        photo: movement.photo || '',
+        time: movement.time
+      })
+    }).catch(() => {});
+  } catch (_) {}
 
   notifyCashRecord();
 
@@ -1858,8 +1940,16 @@ if (cashMovementsList) {
       const date = activeCashDate || getDate();
       const movements = getMovementsForDate(date);
       if (idx >= 0 && idx < movements.length) {
-        movements.splice(idx, 1);
+        const removed = movements.splice(idx, 1)[0];
         saveMovementsForDate(date, movements);
+        if (removed && removed.id) {
+          try {
+            fetch(`${SUPABASE_URL}/rest/v1/cash_movements?id=eq.${encodeURIComponent(removed.id)}`, {
+              method: 'DELETE',
+              headers: supabaseHeaders()
+            }).catch(() => {});
+          } catch (_) {}
+        }
         renderCashDialog();
         showToast("Movimiento eliminado.");
       }
@@ -1936,13 +2026,270 @@ if (cashWhatsappButton) {
 }
 
 if (cashCalendar) {
-  cashCalendar.addEventListener('change', () => {
+  cashCalendar.addEventListener('change', async () => {
     const val = cashCalendar.value;
     if (!val) return;
     const parts = val.split('-');
     if (parts.length === 3) {
       activeCashDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
       renderCashDialog();
+      try {
+        await fetchCashMovementsFromSupabase(activeCashDate);
+        renderCashDialog();
+      } catch (_) {}
     }
   });
 }
+
+// =============================================================
+// GESTOR DE VERSIONES DE APK (SUPABASE)
+// =============================================================
+const apkManagerButton = document.querySelector("#apk-manager-button");
+const apkManagerDialog = document.querySelector("#apk-manager-dialog");
+const apkManagerClose = document.querySelector("#apk-manager-close");
+const apkVersionForm = document.querySelector("#apk-version-form");
+const apkAppName = document.querySelector("#apk-app-name");
+const apkVersionName = document.querySelector("#apk-version-name");
+const apkVersionCode = document.querySelector("#apk-version-code");
+const apkUrlInput = document.querySelector("#apk-url-input");
+const apkChangelog = document.querySelector("#apk-changelog");
+const apkPublishBtn = document.querySelector("#apk-publish-btn");
+const apkFormMessage = document.querySelector("#apk-form-message");
+const apkRefreshBtn = document.querySelector("#apk-refresh-btn");
+const apkVersionsList = document.querySelector("#apk-versions-list");
+
+async function fetchApkVersions() {
+  if (!apkVersionsList) return;
+  apkVersionsList.innerHTML = '<p style="color:var(--muted);font-size:0.9rem">Cargando versiones desde Supabase...</p>';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_versions?order=version_code.desc`, {
+      headers: supabaseHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const list = await res.json();
+    if (!list || !list.length) {
+      apkVersionsList.innerHTML = '<p class="empty-state">No hay versiones registradas aún en Supabase.</p>';
+      return;
+    }
+    apkVersionsList.innerHTML = list.map((v) => {
+      const isOperario = v.app_name === 'operarios';
+      const badgeStyle = isOperario
+        ? 'background:rgba(0,140,149,0.15);color:#008c95;'
+        : 'background:rgba(235,94,85,0.15);color:#eb5e55;';
+      const appTitle = isOperario ? 'Operarios (SPLASH)' : 'Admin (SPLASH Admin)';
+      const dateStr = v.created_at ? new Date(v.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      return `
+        <div class="apk-version-card" style="background:#fff;border:1px solid #dce9ec;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:6px;${badgeStyle}">${appTitle}</span>
+              <strong style="margin-left:8px;font-size:0.95rem;color:#102f49">v${escapeHtml(v.version_name)} (código ${v.version_code})</strong>
+            </div>
+            <small style="color:#64748b;font-size:0.75rem">${dateStr}</small>
+          </div>
+          ${v.changelog ? `<p style="margin:0;font-size:0.85rem;color:#334155">${escapeHtml(v.changelog)}</p>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+            <a href="${escapeHtml(v.apk_url)}" target="_blank" rel="noopener noreferrer" style="font-size:0.8rem;color:#008c95;text-decoration:none;word-break:break-all;max-width:80%">🔗 ${escapeHtml(v.apk_url)}</a>
+            <button type="button" class="secondary-action" data-apk-del-id="${v.id}" style="padding:4px 8px;font-size:0.75rem;color:#ef4444;border-color:#fca5a5" title="Eliminar versión">&times; Borrar</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error cargando versiones:', err);
+    apkVersionsList.innerHTML = `<p style="color:#ef4444;font-size:0.85rem">Error al conectar con Supabase: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function handleApkFormSubmit(e) {
+  e.preventDefault();
+  if (!apkAppName || !apkVersionName || !apkVersionCode || !apkUrlInput) return;
+  const app_name = apkAppName.value;
+  const version_name = apkVersionName.value.trim();
+  const version_code = parseInt(apkVersionCode.value, 10);
+  const apk_url = apkUrlInput.value.trim();
+  const changelog = (apkChangelog?.value || '').trim();
+
+  if (!version_name || isNaN(version_code) || !apk_url) {
+    if (apkFormMessage) {
+      apkFormMessage.textContent = 'Por favor completa todos los campos requeridos.';
+      apkFormMessage.style.color = '#ef4444';
+    }
+    return;
+  }
+
+  if (apkPublishBtn) {
+    apkPublishBtn.disabled = true;
+    apkPublishBtn.textContent = 'Publicando...';
+  }
+
+  try {
+    const payload = {
+      app_name,
+      version_name,
+      version_code,
+      apk_url,
+      changelog,
+      is_active: true,
+      is_mandatory: false,
+      created_at: new Date().toISOString()
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_versions`, {
+      method: 'POST',
+      headers: supabaseHeaders({
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      }),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errBody}`);
+    }
+
+    if (apkFormMessage) {
+      apkFormMessage.textContent = '¡Versión publicada con éxito en Supabase!';
+      apkFormMessage.style.color = '#008c95';
+    }
+    showToast(`APK ${version_name} publicado en Supabase.`);
+    apkVersionForm.reset();
+    await fetchApkVersions();
+  } catch (err) {
+    console.error('Error al publicar APK en Supabase:', err);
+    if (apkFormMessage) {
+      apkFormMessage.textContent = `Error al publicar: ${err.message}`;
+      apkFormMessage.style.color = '#ef4444';
+    }
+    showToast('Error al publicar versión en Supabase.');
+  } finally {
+    if (apkPublishBtn) {
+      apkPublishBtn.disabled = false;
+      apkPublishBtn.textContent = '🚀 Publicar en Supabase';
+    }
+  }
+}
+
+if (apkManagerButton) {
+  apkManagerButton.addEventListener('click', () => {
+    closeNavigation();
+    if (apkManagerDialog) {
+      apkManagerDialog.showModal();
+      fetchApkVersions();
+    }
+  });
+}
+
+if (apkManagerClose) {
+  apkManagerClose.addEventListener('click', () => {
+    if (apkManagerDialog) apkManagerDialog.close();
+  });
+}
+
+if (apkManagerDialog) {
+  apkManagerDialog.addEventListener('click', (e) => {
+    if (e.target === apkManagerDialog) apkManagerDialog.close();
+  });
+}
+
+if (apkRefreshBtn) {
+  apkRefreshBtn.addEventListener('click', fetchApkVersions);
+}
+
+if (apkVersionForm) {
+  apkVersionForm.addEventListener('submit', handleApkFormSubmit);
+}
+
+if (apkVersionsList) {
+  apkVersionsList.addEventListener('click', async (e) => {
+    const delBtn = e.target.closest('[data-apk-del-id]');
+    if (!delBtn) return;
+    const id = delBtn.dataset.apkDelId;
+    if (!id) return;
+    if (typeof confirm === 'function' && !confirm('¿Seguro que deseas eliminar el registro de esta versión?')) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_versions?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders()
+      });
+      showToast('Versión eliminada.');
+      fetchApkVersions();
+    } catch (err) {
+      showToast('Error al eliminar versión.');
+    }
+  });
+}
+
+// =============================================================
+// AVISO Y DESCARGA DE APK PARA ADMINISTRADORES
+// =============================================================
+const adminUpdateBanner = document.querySelector("#admin-update-banner");
+const adminUpdateBannerTitle = document.querySelector("#admin-update-banner-title");
+const adminUpdateBannerDesc = document.querySelector("#admin-update-banner-desc");
+const adminUpdateBannerBtn = document.querySelector("#admin-update-banner-btn");
+const adminUpdateBannerManage = document.querySelector("#admin-update-banner-manage");
+const adminLoginDownloadApk = document.querySelector("#admin-login-download-apk");
+
+const DEFAULT_ADMIN_APK_URL = 'https://pauluwu18.github.io/sphash-sede-las-flores-app/SPLASH-Admin.apk';
+let cachedAdminApkUrl = DEFAULT_ADMIN_APK_URL;
+
+function triggerDownloadAdminApk(url) {
+  const target = url || cachedAdminApkUrl || DEFAULT_ADMIN_APK_URL;
+  try {
+    const a = document.createElement('a');
+    a.href = target;
+    a.download = target.split('/').pop() || 'SPLASH-Admin.apk';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (_) {}
+  setTimeout(() => {
+    try { window.location.href = target; } catch (_) {}
+  }, 300);
+}
+
+async function checkAdminAppVersionQuietly() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_versions?order=created_at.desc&limit=5`, {
+      headers: supabaseHeaders()
+    });
+    if (!res.ok) return;
+    const list = await res.json();
+    if (!list || !list.length) return;
+
+    const adminVer = list.find((v) => v.app_name === 'admin');
+    const operarioVer = list.find((v) => v.app_name === 'operarios');
+
+    if (adminVer && adminVer.apk_url) cachedAdminApkUrl = adminVer.apk_url;
+
+    if (adminUpdateBanner) {
+      adminUpdateBanner.hidden = false;
+      if (adminUpdateBannerTitle) {
+        adminUpdateBannerTitle.textContent = adminVer
+          ? `🔔 ¡Nueva versión disponible: SPLASH Admin v${adminVer.version_name}!`
+          : `🔔 ¡Nueva versión de APK registrada en Supabase!`;
+      }
+      if (adminUpdateBannerDesc) {
+        adminUpdateBannerDesc.textContent = (adminVer && adminVer.changelog) || (operarioVer && operarioVer.changelog) || 'Hay una nueva actualización disponible para la app.';
+      }
+    }
+  } catch (_) {}
+}
+
+if (adminUpdateBannerBtn) {
+  adminUpdateBannerBtn.addEventListener('click', () => triggerDownloadAdminApk(cachedAdminApkUrl));
+}
+if (adminUpdateBannerManage) {
+  adminUpdateBannerManage.addEventListener('click', () => {
+    if (apkManagerDialog) {
+      apkManagerDialog.showModal();
+      fetchApkVersions();
+    }
+  });
+}
+if (adminLoginDownloadApk) {
+  adminLoginDownloadApk.addEventListener('click', () => triggerDownloadAdminApk(DEFAULT_ADMIN_APK_URL));
+}
+
+checkAdminAppVersionQuietly();
