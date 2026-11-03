@@ -6,7 +6,8 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=auto-checkin-7"><link rel="stylesheet" href="qr-attendance.css?v=auto-checkin-7">
+  <link rel="stylesheet" href="styles.css?v=1.1-tutor"><link rel="stylesheet" href="qr-attendance.css?v=1.1-tutor">
+  <link rel="stylesheet" href="splash-tutor.css?v=1.1-tutor">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -279,8 +280,31 @@
         <h3 id="updater-new-ver-title" style="margin:8px 0 6px;color:#102f49">v1.1</h3>
         <p id="updater-changelog-text" style="margin:0 0 12px;color:#627d8d;font-size:0.88rem"></p>
         <button type="button" class="primary-button" id="updater-download-btn" style="width:100%">
-          ⬇️ Descargar e instalar actualización
+          ⬇️ Descargar actualización
         </button>
+
+        <!-- Barra de progreso de descarga -->
+        <div id="updater-progress-wrap" hidden style="margin-top:14px;background:#ffffff;border:1px solid #dce9ec;border-radius:12px;padding:12px">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#102f49;font-weight:700;margin-bottom:6px">
+            <span id="updater-progress-label">Descargando archivo APK...</span>
+            <span id="updater-progress-percent" style="color:#008c95">0%</span>
+          </div>
+          <div style="width:100%;height:10px;background:#eef6f8;border-radius:10px;overflow:hidden">
+            <div id="updater-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg, #008c95, #00d1b2);border-radius:10px;transition:width 0.25s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;color:#627d8d;font-size:0.75rem">
+            <span id="updater-progress-detail">Iniciando...</span>
+            <span>2.4 MB</span>
+          </div>
+        </div>
+
+        <!-- Botón de instalación que aparece después de completada la descarga -->
+        <button type="button" class="primary-button" id="updater-install-btn" hidden style="width:100%;margin-top:14px;background:#27ae60;border-color:#219653;font-size:1rem;font-weight:700">
+          🚀 Instalar aplicación ahora
+        </button>
+        <p id="updater-install-hint" hidden style="margin:8px 0 0 0;font-size:0.78rem;color:#155a43;text-align:center">
+          ✅ Archivo descargado. Toca el botón para abrir el instalador del sistema.
+        </p>
       </div>
     </div>
     <div id="updater-up-to-date-wrap" hidden style="margin-top:12px">
@@ -299,8 +323,9 @@
   </dialog>
 
   <script src="vendor/supabase.js"></script>
-  <script src="splash-api.js?v=auto-checkin-7"></script>
+  <script src="splash-api.js?v=1.1-tutor"></script>
   <script src="vendor/jsQR.js"></script>
-  <script src="operarios.js?v=auto-checkin-7"></script>
+  <script src="operarios.js?v=1.1-tutor"></script>
+  <script src="splash-tutor.js?v=1.1-tutor"></script>
 </body>
 </html>

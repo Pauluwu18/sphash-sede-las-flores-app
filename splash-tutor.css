@@ -1,0 +1,431 @@
+/* ==========================================================================
+   SPLASH Sede Las Flores - Sistema de Tutor Interactivo
+   Burbuja de ayuda fija, spotlight dinámico y personaje de asistencia
+   ========================================================================== */
+
+/* 1. BURBUJA DE AYUDA FIJA */
+.splash-tutor-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #008c95;
+  box-shadow: 0 4px 16px rgba(0, 140, 149, 0.32), 0 2px 8px rgba(0, 0, 0, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 9998;
+  padding: 0;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, opacity 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.splash-tutor-fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0, 140, 149, 0.42), 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.splash-tutor-fab:active {
+  transform: scale(0.95);
+}
+
+.splash-tutor-fab-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.splash-tutor-fab-fallback {
+  font-size: 1.6rem;
+  line-height: 1;
+  font-weight: 800;
+  color: #008c95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 2. OVERLAY OSCURECIDO Y SPOTLIGHT */
+.splash-tutor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 42, 67, 0.72);
+  z-index: 9994;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.splash-tutor-overlay.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Rectángulo dinámico con hueco spotlight */
+.splash-tutor-spotlight {
+  position: fixed;
+  border-radius: 14px;
+  border: 3px solid #00d1b2;
+  box-shadow: 0 0 0 9999px rgba(16, 42, 67, 0.75), 0 0 20px rgba(0, 209, 178, 0.6);
+  z-index: 9996;
+  pointer-events: none;
+  opacity: 0;
+  transition: top 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+              left 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+              width 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+              height 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+              opacity 0.25s ease;
+  animation: splashTutorPulse 2s infinite ease-in-out;
+}
+
+.splash-tutor-spotlight.is-active {
+  opacity: 1;
+}
+
+@keyframes splashTutorPulse {
+  0%, 100% {
+    border-color: #00d1b2;
+    box-shadow: 0 0 0 9999px rgba(16, 42, 67, 0.75), 0 0 16px rgba(0, 209, 178, 0.5);
+  }
+  50% {
+    border-color: #38ef7d;
+    box-shadow: 0 0 0 9999px rgba(16, 42, 67, 0.75), 0 0 30px rgba(0, 209, 178, 0.9);
+  }
+}
+
+/* 3. ESCENARIO DEL PERSONAJE Y DIÁLOGO */
+.splash-tutor-stage {
+  position: fixed;
+  z-index: 9997;
+  pointer-events: none;
+  transition: top 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+              left 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+              opacity 0.25s ease;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  max-width: min(92vw, 420px);
+}
+
+.splash-tutor-stage.is-reversed {
+  flex-direction: row-reverse;
+}
+
+/* Personaje tutor */
+.splash-tutor-char-wrap {
+  flex-shrink: 0;
+  width: 130px;
+  pointer-events: auto;
+  user-select: none;
+  animation: splashTutorSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@media (min-width: 600px) {
+  .splash-tutor-char-wrap {
+    width: 160px;
+  }
+}
+
+.splash-tutor-char-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
+  transition: transform 0.25s ease;
+}
+
+.splash-tutor-char-img.is-flipped {
+  transform: scaleX(-1);
+}
+
+@keyframes splashTutorSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Burbuja de diálogo */
+.splash-tutor-bubble {
+  background: #ffffff;
+  border: 2px solid #008c95;
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 14px 34px rgba(16, 42, 67, 0.3), 0 2px 8px rgba(0, 0, 0, 0.1);
+  pointer-events: auto;
+  flex: 1;
+  position: relative;
+  animation: splashTutorPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes splashTutorPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Cola de la burbuja */
+.splash-tutor-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: 22px;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+}
+
+.splash-tutor-stage:not(.is-reversed) .splash-tutor-bubble::after {
+  left: -20px;
+  border-right-color: #008c95;
+}
+
+.splash-tutor-stage.is-reversed .splash-tutor-bubble::after {
+  right: -20px;
+  border-left-color: #008c95;
+}
+
+/* Contenido del diálogo */
+.splash-tutor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.splash-tutor-step-pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #008c95;
+  background: rgba(0, 140, 149, 0.12);
+  padding: 3px 9px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.splash-tutor-close-btn {
+  background: none;
+  border: none;
+  color: #627d8d;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.splash-tutor-close-btn:hover {
+  color: #102f49;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.splash-tutor-title {
+  margin: 0 0 6px 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #102f49;
+  line-height: 1.3;
+}
+
+.splash-tutor-text {
+  margin: 0 0 14px 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #334e68;
+}
+
+.splash-tutor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.splash-tutor-btn-primary {
+  background: #008c95;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 140, 149, 0.28);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.splash-tutor-btn-primary:hover {
+  background: #00757d;
+  transform: translateY(-1px);
+}
+
+.splash-tutor-btn-primary:active {
+  transform: translateY(0);
+}
+
+.splash-tutor-btn-secondary {
+  background: #f0f4f8;
+  color: #334e68;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.splash-tutor-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* 4. MODAL / MENÚ DE AYUDA RÁPIDA (al pulsar ❓) */
+.splash-tutor-menu-card {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  width: min(92vw, 360px);
+  background: #ffffff;
+  border: 2px solid #008c95;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 16px 40px rgba(16, 42, 67, 0.35);
+  z-index: 9998;
+  animation: splashTutorPopIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.splash-tutor-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.splash-tutor-menu-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #008c95;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.splash-tutor-menu-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #102f49;
+}
+
+.splash-tutor-menu-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 0.8rem;
+  color: #627d8d;
+}
+
+.splash-tutor-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.splash-tutor-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f7fafb;
+  border: 1px solid #dce9ec;
+  border-radius: 10px;
+  color: #102f49;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  width: 100%;
+}
+
+.splash-tutor-menu-item:hover {
+  background: #eef7f9;
+  border-color: #008c95;
+  transform: translateX(3px);
+}
+
+.splash-tutor-menu-item-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.splash-tutor-menu-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #eef2f6;
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+/* 5. MODAL DE BIENVENIDA (Primera vez) */
+.splash-tutor-welcome-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 400px);
+  background: #ffffff;
+  border: 3px solid #008c95;
+  border-radius: 22px;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(16, 42, 67, 0.45);
+  z-index: 9999;
+  text-align: center;
+  animation: splashTutorPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.splash-tutor-welcome-char {
+  width: 140px;
+  height: auto;
+  margin: -10px auto 10px auto;
+  display: block;
+}
+
+.splash-tutor-welcome-title {
+  margin: 0 0 8px 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #102f49;
+}
+
+.splash-tutor-welcome-desc {
+  margin: 0 0 20px 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #486581;
+}
+
+.splash-tutor-welcome-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}

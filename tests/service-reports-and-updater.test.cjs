@@ -21,6 +21,9 @@ function page(file, handler) {
       return new Response(Buffer.from('fake-image-bytes'), { status: 200 });
     }
     const result = typeof handler === 'function' ? await handler(url, options) : [];
+    if (result && typeof result === 'object' && ('status' in result || result instanceof Response)) {
+      return result;
+    }
     return new Response(JSON.stringify(result), { status: 200 });
   };
   w.setInterval = () => 0;
@@ -382,6 +385,115 @@ test('Operarios: en versión antigua de la APK (sin getAppVersion) detecta actua
   assert.ok($('updater-redownload-btn'), 'El botón de descargar de todas formas debe existir');
   $('updater-redownload-btn').click();
   await flush();
+});
+
+test('Operarios: barra de progreso de descarga y botón de instalación tras completar descarga', async (t) => {
+  const dom = page('operarios.html', async (url) => {
+    // Simular error 404 de Supabase (tabla no creada todavía)
+    return { ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) };
+  });
+  t.after(() => {
+    dom.window.dispatchEvent(new dom.window.Event('pagehide'));
+    dom.window.close();
+  });
+  const w = dom.window;
+  w.setInterval = global.setInterval;
+  w.clearInterval = global.clearInterval;
+  const $ = (id) => w.document.getElementById(id);
+
+  vm.runInContext(fs.readFileSync('splash-api.js', 'utf8'), dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('operarios.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+
+  // Abrir actualizador
+  $('open-updater').click();
+  await flush();
+
+  // Verificar que NO muestra "No se pudo conectar con Supabase"
+  const statusText = $('updater-status-text') ? $('updater-status-text').textContent : '';
+  assert.doesNotMatch(statusText, /No se pudo conectar con Supabase/i, 'No debe mostrar mensaje de error de Supabase');
+
+  // La actualización v1.1 debe mostrarse disponible
+  assert.equal($('updater-available-wrap').hidden, false, 'Debe mostrar actualización v1.1 disponible directamente');
+
+  // Iniciar descarga
+  const downloadBtn = $('updater-download-btn');
+  assert.ok(downloadBtn, 'Botón de descarga debe existir');
+  downloadBtn.click();
+
+  // La barra de progreso debe hacerse visible y el botón de descarga ocultarse
+  assert.equal($('updater-progress-wrap').hidden, false, 'La barra de progreso debe ser visible');
+  assert.equal(downloadBtn.hidden, true, 'El botón de descarga inicial debe ocultarse');
+
+  // Esperar a que la simulación de descarga avance
+  await new Promise((resolve) => setTimeout(resolve, 1800));
+
+  // Al finalizar la descarga, debe aparecer el botón de instalar aplicación
+  assert.equal($('updater-install-btn').hidden, false, 'El botón de instalar debe aparecer tras completar la descarga');
+  assert.match($('updater-install-btn').textContent, /Instalar aplicación ahora/i);
+});
+
+test('Tutor interactivo SPLASH: burbuja flotante, pasos con spotlight y menú rápido', async (t) => {
+  const dom = page('operarios.html', async () => []);
+  t.after(() => {
+    if (dom.window.splashTutor) dom.window.splashTutor.destroy();
+    dom.window.dispatchEvent(new dom.window.Event('pagehide'));
+    dom.window.close();
+  });
+  const w = dom.window;
+  const $ = (id) => w.document.getElementById(id);
+
+  vm.runInContext(fs.readFileSync('splash-api.js', 'utf8'), dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('operarios.js', 'utf8'), dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('splash-tutor.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+
+  // 1. Verificar existencia de la burbuja fija ❓
+  const fab = $('splash-tutor-fab');
+  assert.ok(fab, 'La burbuja de ayuda ❓ debe existir en el DOM');
+  const fabImg = fab.querySelector('img');
+  assert.ok(fabImg, 'La burbuja debe tener la imagen de avatar');
+
+  // 2. Iniciar el tutor interactivo desde el objeto global
+  assert.ok(w.splashTutor, 'El tutor SplashTutor debe estar instanciado');
+  w.splashTutor.startTutorial(0);
+  await new Promise((resolve) => setTimeout(resolve, 350));
+
+  // El overlay y el spotlight deben estar activos
+  assert.ok($('splash-tutor-overlay').classList.contains('is-active'), 'Overlay debe estar activo');
+  assert.ok($('splash-tutor-spotlight').classList.contains('is-active'), 'Spotlight debe estar activo');
+  assert.match($('splash-tutor-title').textContent, /Reportar servicio/i);
+
+  // 3. Avanzar al paso 2 (Operario): debe desplegar automáticamente el panel de servicios
+  w.splashTutor.nextStep();
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  assert.match($('splash-tutor-title').textContent, /Operario/i);
+  assert.equal($('service-report-panel').hidden, false, 'El panel de reporte debe mostrarse en el paso 2');
+
+  // 4. Avanzar por todos los pasos hasta el último (paso 8)
+  for (let i = 2; i < 8; i++) {
+    w.splashTutor.nextStep();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.match($('splash-tutor-title').textContent, /Mandar al grupo/i);
+
+  // 5. Finalizar el tutorial: celebración y guardado en localStorage
+  w.splashTutor.nextStep(); // Paso final
+  await flush();
+  assert.match($('splash-tutor-title').textContent, /¡Perfecto! 🎉/i);
+
+  // Tocar botón finalizar
+  $('splash-tutor-next-btn').click();
+  await flush();
+  assert.equal(w.localStorage.getItem('splash_tutor_completed'), 'true', 'Debe marcar el tutorial como completado');
+  assert.equal($('splash-tutor-stage').style.display, 'none', 'El tutor debe quedar oculto');
+
+  // 6. Al pulsar la burbuja ❓ habiendo completado el tutorial, debe abrir el menú de ayuda rápida
+  fab.click();
+  await flush();
+  assert.notEqual($('splash-tutor-quick-menu').style.display, 'none', 'Debe abrir el menú de ayuda rápida');
+  const menuItems = w.document.querySelectorAll('.splash-tutor-menu-item');
+  assert.ok(menuItems.length >= 4, 'Debe contener las opciones de ayuda rápida');
 });
 
 

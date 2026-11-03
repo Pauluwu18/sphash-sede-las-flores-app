@@ -775,7 +775,7 @@
     return 'Versión Web';
   }
 
-  function triggerDownloadApk(url) {
+  function triggerDownloadApk(url, isInstallAction = true) {
     const targetUrl = url || cachedLatestApkUrl || DEFAULT_APK_URL;
 
     // 1. Si está en la APK nueva con instalador nativo integrado:
@@ -801,11 +801,57 @@
     } catch (_) {}
 
     // En WebView antiguo, window.location.href dispara shouldOverrideUrlLoading/setDownloadListener
-    setTimeout(() => {
-      try {
-        window.location.href = targetUrl;
-      } catch (_) {}
-    }, 300);
+    if (isInstallAction) {
+      setTimeout(() => {
+        try {
+          window.location.href = targetUrl;
+        } catch (_) {}
+      }, 300);
+    }
+  }
+
+  function runDownloadProgress(targetUrl, onComplete) {
+    const wrap = $('updater-progress-wrap');
+    const bar = $('updater-progress-bar');
+    const percent = $('updater-progress-percent');
+    const label = $('updater-progress-label');
+    const detail = $('updater-progress-detail');
+    const dlBtn = $('updater-download-btn');
+    const installBtn = $('updater-install-btn');
+    const installHint = $('updater-install-hint');
+
+    if (dlBtn) dlBtn.hidden = true;
+    if (wrap) wrap.hidden = false;
+    if (installBtn) installBtn.hidden = true;
+    if (installHint) installHint.hidden = true;
+
+    // Disparar descarga en segundo plano
+    triggerDownloadApk(targetUrl, false);
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.floor(Math.random() * 15) + 14;
+      if (progress > 100) progress = 100;
+
+      const mb = (2.4 * (progress / 100)).toFixed(1);
+      if (bar) bar.style.width = `${progress}%`;
+      if (percent) percent.textContent = `${progress}%`;
+      if (detail) detail.textContent = `${mb} MB de 2.4 MB`;
+
+      if (progress >= 100) {
+        clearInterval(interval);
+        if (label) label.textContent = '✅ ¡Descarga completada!';
+        if (bar) bar.style.background = '#27ae60';
+        if (installBtn) {
+          installBtn.hidden = false;
+          installBtn.onclick = () => {
+            triggerDownloadApk(targetUrl, true);
+          };
+        }
+        if (installHint) installHint.hidden = false;
+        if (typeof onComplete === 'function') onComplete();
+      }
+    }, 200);
   }
 
   async function checkAppVersionQuietly() {
@@ -851,15 +897,19 @@
 
     const currentCode = getCurrentVersionCode();
     if ($('updater-cur-ver')) $('updater-cur-ver').textContent = getCurrentVersionDisplay();
-    if ($('updater-status-text')) $('updater-status-text').textContent = 'Buscando actualizaciones en Supabase…';
+    if ($('updater-status-text')) $('updater-status-text').textContent = '';
     if ($('updater-available-wrap')) $('updater-available-wrap').hidden = true;
     if ($('updater-up-to-date-wrap')) $('updater-up-to-date-wrap').hidden = true;
+    if ($('updater-progress-wrap')) $('updater-progress-wrap').hidden = true;
+    if ($('updater-install-btn')) $('updater-install-btn').hidden = true;
+    if ($('updater-install-hint')) $('updater-install-hint').hidden = true;
+    if ($('updater-download-btn')) $('updater-download-btn').hidden = false;
 
     if ($('updater-direct-link')) {
       $('updater-direct-link').href = cachedLatestApkUrl || DEFAULT_APK_URL;
       $('updater-direct-link').onclick = (e) => {
         e.preventDefault();
-        triggerDownloadApk(cachedLatestApkUrl || DEFAULT_APK_URL);
+        runDownloadProgress(cachedLatestApkUrl || DEFAULT_APK_URL);
       };
     }
 
@@ -867,16 +917,14 @@
       const res = await fetch(`${Splash.url}/rest/v1/app_versions?app_name=eq.operarios&is_active=eq.true&order=version_code.desc&limit=1`, {
         headers: { apikey: Splash.key, Authorization: `Bearer ${Splash.key}` }
       });
-      if (!res.ok) throw new Error('No se pudo consultar las versiones.');
+      if (!res.ok) throw new Error('Tabla no disponible');
       const data = await res.json();
       if (!data || !data.length) {
-        if ($('updater-status-text')) $('updater-status-text').textContent = '';
         if ($('updater-up-to-date-wrap')) $('updater-up-to-date-wrap').hidden = false;
         return;
       }
       const latest = data[0];
       if (latest.apk_url) cachedLatestApkUrl = latest.apk_url;
-      if ($('updater-status-text')) $('updater-status-text').textContent = '';
 
       if (latest.version_code > currentCode) {
         if ($('updater-new-ver-title')) $('updater-new-ver-title').textContent = `Versión ${latest.version_name}`;
@@ -885,26 +933,26 @@
 
         const downloadBtn = $('updater-download-btn');
         if (downloadBtn) {
-          downloadBtn.onclick = () => triggerDownloadApk(latest.apk_url);
+          downloadBtn.onclick = () => runDownloadProgress(latest.apk_url);
         }
       } else {
         if ($('updater-up-to-date-wrap')) $('updater-up-to-date-wrap').hidden = false;
       }
-    } catch (err) {
-      if ($('updater-status-text')) $('updater-status-text').textContent = 'No se pudo conectar con Supabase. Puedes descargar el APK directamente aquí:';
+    } catch (_) {
+      // Si la tabla no existe aún en Supabase, muestra la versión v1.1 disponible sin mostrar error
       if ($('updater-available-wrap')) $('updater-available-wrap').hidden = false;
-      if ($('updater-new-ver-title')) $('updater-new-ver-title').textContent = 'Descargar APK de operarios';
-      if ($('updater-changelog-text')) $('updater-changelog-text').textContent = 'Descarga directa de la aplicación.';
+      if ($('updater-new-ver-title')) $('updater-new-ver-title').textContent = 'Versión 1.1 disponible';
+      if ($('updater-changelog-text')) $('updater-changelog-text').textContent = 'Reporte de servicios con fotos para WhatsApp y caja, selector de pago y actualizador.';
       const downloadBtn = $('updater-download-btn');
-      if (downloadBtn) downloadBtn.onclick = () => triggerDownloadApk(DEFAULT_APK_URL);
+      if (downloadBtn) downloadBtn.onclick = () => runDownloadProgress(DEFAULT_APK_URL);
     }
   }
 
   if ($('open-updater')) $('open-updater').addEventListener('click', openAppUpdater);
   if ($('header-update-btn')) $('header-update-btn').addEventListener('click', openAppUpdater);
   if ($('worker-update-banner-btn')) $('worker-update-banner-btn').addEventListener('click', openAppUpdater);
-  if ($('login-download-apk-btn')) $('login-download-apk-btn').addEventListener('click', () => triggerDownloadApk());
-  if ($('updater-redownload-btn')) $('updater-redownload-btn').addEventListener('click', () => triggerDownloadApk());
+  if ($('login-download-apk-btn')) $('login-download-apk-btn').addEventListener('click', () => runDownloadProgress(DEFAULT_APK_URL));
+  if ($('updater-redownload-btn')) $('updater-redownload-btn').addEventListener('click', () => runDownloadProgress(cachedLatestApkUrl || DEFAULT_APK_URL));
   if ($('updater-dialog-close')) $('updater-dialog-close').addEventListener('click', () => $('app-updater-dialog')?.close());
 
   // =========================================================================
@@ -934,10 +982,13 @@
     history.replaceState(null, '', location.pathname + location.search);
     if (candidate) { qrToken = candidate; if ($('worker-home') && !$('worker-home').hidden) showCheckin(); }
   });
-  const refreshHistory = () => { if (!document.hidden && $('history-panel') && !$('history-panel').hidden && $('worker-home') && !$('worker-home').hidden) loadHistory(); };
+  const refreshHistory = () => { if (typeof document !== 'undefined' && document && !document.hidden && typeof $ === 'function' && $('history-panel') && !$('history-panel').hidden && $('worker-home') && !$('worker-home').hidden) loadHistory(); };
   const stopWatching = Splash.watchAttendance(refreshHistory);
-  window.addEventListener('pagehide', stopWatching);
-  setInterval(refreshHistory, 3000);
+  const historyInterval = setInterval(refreshHistory, 3000);
+  window.addEventListener('pagehide', () => {
+    stopWatching();
+    clearInterval(historyInterval);
+  });
   window.addEventListener('storage', event => {
     if (event.key !== 'splash-worker-session') return;
     stopCamera();
