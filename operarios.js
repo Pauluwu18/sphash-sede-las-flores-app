@@ -890,23 +890,13 @@
 
       if (latest.version_code > currentCode) {
         if ($('updater-menu-subtitle')) {
-          $('updater-menu-subtitle').textContent = `¡Nueva versión v${latest.version_name} disponible! Toca para actualizar.`;
-          $('updater-menu-subtitle').style.color = '#e85b2a';
-          $('updater-menu-subtitle').style.fontWeight = 'bold';
+          $('updater-menu-subtitle').textContent = `Versión v${latest.version_name} en vivo`;
         }
         if ($('header-update-btn')) {
-          $('header-update-btn').textContent = `🔔 Actualizar a v${latest.version_name}`;
-          $('header-update-btn').style.background = '#e85b2a';
-          $('header-update-btn').style.color = '#fff';
+          $('header-update-btn').textContent = `🔄 Actualizar app`;
         }
         if ($('worker-update-banner')) {
-          $('worker-update-banner').hidden = false;
-          if ($('worker-update-banner-title')) {
-            $('worker-update-banner-title').textContent = `🔔 ¡Nueva versión v${latest.version_name} disponible!`;
-          }
-          if ($('worker-update-banner-desc') && latest.changelog) {
-            $('worker-update-banner-desc').textContent = latest.changelog;
-          }
+          $('worker-update-banner').hidden = true;
         }
       }
     } catch (_) {}

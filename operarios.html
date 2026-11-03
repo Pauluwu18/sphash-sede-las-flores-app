@@ -6,8 +6,8 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.3-centered"><link rel="stylesheet" href="qr-attendance.css?v=1.3-centered">
-  <link rel="stylesheet" href="splash-tutor.css?v=1.3-centered">
+  <link rel="stylesheet" href="styles.css?v=1.4-blocked-admin"><link rel="stylesheet" href="qr-attendance.css?v=1.4-blocked-admin">
+  <link rel="stylesheet" href="splash-tutor.css?v=1.4-blocked-admin">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -23,13 +23,12 @@
       <button class="login-button" id="worker-submit" type="submit">Iniciar sesión</button>
       <p class="login-message" id="worker-login-message" role="status"></p>
       <p class="worker-help">¿Primera vez? Tu administrador debe registrar tu DNI. Crea tu PIN personal desde la app.</p>
-      <div style="margin-top:14px;padding:12px;background:#eef6f8;border-radius:12px;text-align:center;border:1px solid #d0e7eb">
-        <small style="color:#008c95;font-weight:700;display:block">¿Tienes una versión antigua o necesitas la app?</small>
-        <button type="button" class="secondary-action" id="login-download-apk-btn" style="margin-top:8px;width:100%;font-size:0.85rem;font-weight:600">
+      <div style="display:none !important;" hidden aria-hidden="true">
+        <button type="button" class="secondary-action" id="login-download-apk-btn">
           📥 Descargar APK (Actualización)
         </button>
       </div>
-      <a class="portal-link" href="admin.html">Entrar como administrador</a>
+      <a class="portal-link" href="admin.html" style="display:none !important;" hidden aria-hidden="true">Entrar como administrador</a>
     </form>
   </div>
   <main class="worker-shell" id="worker-home" hidden>
@@ -337,9 +336,9 @@
   </dialog>
 
   <script src="vendor/supabase.js"></script>
-  <script src="splash-api.js?v=1.3-centered"></script>
+  <script src="splash-api.js?v=1.4-blocked-admin"></script>
   <script src="vendor/jsQR.js"></script>
-  <script src="operarios.js?v=1.3-centered"></script>
-  <script src="splash-tutor.js?v=1.3-centered"></script>
+  <script src="operarios.js?v=1.4-blocked-admin"></script>
+  <script src="splash-tutor.js?v=1.4-blocked-admin"></script>
 </body>
 </html>
