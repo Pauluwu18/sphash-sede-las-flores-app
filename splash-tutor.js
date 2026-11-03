@@ -22,9 +22,9 @@
     },
     {
       id: 'step-operator',
-      selector: '#sr-operator-input',
+      selector: '.sr-operator-bar',
       title: 'Operario',
-      text: 'Aquí podrás comprobar qué operario está realizando el reporte. Si necesitas cambiarlo, puedes editar el nombre directamente.',
+      text: 'Aquí se muestra tu nombre como operario responsable de la sesión. Si realizaron el servicio entre 2 personas, puedes agregar a tu compañero pulsando "+ Agregar otro operario".',
       onBefore: () => {
         const menu = document.getElementById('worker-menu');
         const panel = document.getElementById('service-report-panel');
@@ -85,8 +85,8 @@
     {
       id: 'step-submit',
       selector: '#sr-submit-whatsapp',
-      title: 'Mandar al grupo SPHASH SEDE LAS FLORES',
-      text: 'Cuando hayas terminado, revisa los datos y pulsa aquí. Se guardará en la caja de administración y se enviará con foto y formato listo a WhatsApp.',
+      title: 'Enviar',
+      text: 'Cuando hayas terminado, revisa los datos y pulsa "Enviar". Tu reporte se enviará con su foto y formato listo al instante.',
       onBefore: () => {
         const panel = document.getElementById('service-report-panel');
         if (panel) panel.hidden = false;

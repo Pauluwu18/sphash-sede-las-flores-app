@@ -6,8 +6,8 @@
   <title>Mi asistencia · SPLASH SEDE LAS FLORES</title>
   <link rel="icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.1-tutor"><link rel="stylesheet" href="qr-attendance.css?v=1.1-tutor">
-  <link rel="stylesheet" href="splash-tutor.css?v=1.1-tutor">
+  <link rel="stylesheet" href="styles.css?v=1.2-payicons"><link rel="stylesheet" href="qr-attendance.css?v=1.2-payicons">
+  <link rel="stylesheet" href="splash-tutor.css?v=1.2-payicons">
 </head>
 <body class="worker-page">
   <div class="login-screen" id="worker-login">
@@ -65,7 +65,7 @@
           <path d="M7 15h.01M17 15h.01"/>
         </svg>
         <strong>Reportar servicio</strong>
-        <span>Foto del dinero, número de servicio y enviar al grupo de WhatsApp y a caja.</span>
+        <span>Foto del dinero, número de servicio y método de pago para enviar tu reporte.</span>
       </button>
 
       <button class="worker-menu-card" id="open-checkin" type="button">
@@ -99,20 +99,36 @@
 
     <!-- PANEL DE REPORTE DE SERVICIOS PARA OPERARIOS -->
     <section class="worker-panel" id="service-report-panel" hidden aria-labelledby="service-report-title">
-      <p class="section-kicker">Caja y WhatsApp</p>
+      <p class="section-kicker">Reporte de servicios</p>
       <h2 id="service-report-title">Reportar servicio</h2>
-      <p>Completa los datos del servicio realizado. Se guardará en la caja de administración y se enviará con foto al grupo de WhatsApp.</p>
+      <p>Completa los datos del servicio realizado para enviarlo con su foto y registro listo.</p>
 
       <form id="sr-form" onsubmit="return false;">
         <!-- OPERARIO -->
         <div class="sr-field-group">
-          <div class="sr-operator-bar">
-            <span>Operario:</span>
-            <strong id="sr-operator-display">—</strong>
-            <button type="button" class="sr-text-btn" id="sr-toggle-op-btn">Cambiar</button>
+          <div class="sr-operator-bar" style="display:flex;align-items:center;justify-content:space-between;background:#eef6f8;border:1px solid #bfdde0;border-radius:10px;padding:10px 14px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:0.85rem;color:#627d8d">Operario:</span>
+              <strong id="sr-operator-display" style="color:#102f49;font-size:1rem">—</strong>
+              <span title="Operario verificado con sesión" style="font-size:0.85rem">🔒</span>
+            </div>
+            <button type="button" class="sr-text-btn" id="sr-add-second-op-btn" style="color:#008c95;font-weight:700;font-size:0.82rem;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px">
+              + Agregar otro operario (si fueron 2)
+            </button>
           </div>
-          <div id="sr-operator-custom-wrap" hidden style="margin-top:8px">
-            <input type="text" id="sr-operator-input" class="worker-input" placeholder="Nombre del operario (ej. Yerson)">
+          <input type="hidden" id="sr-operator-input">
+
+          <!-- Campo desplegable para segundo operario -->
+          <div id="sr-second-op-wrap" hidden style="margin-top:10px;background:#f0fafb;padding:12px;border-radius:12px;border:1.5px dashed #008c95">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <label for="sr-second-operator-input" style="font-size:0.85rem;font-weight:700;color:#102f49">
+                👥 Segundo operario (acompañante):
+              </label>
+              <button type="button" id="sr-remove-second-op-btn" style="color:#e74c3c;font-size:0.8rem;background:none;border:none;cursor:pointer;font-weight:600">
+                ✕ Quitar
+              </button>
+            </div>
+            <input type="text" id="sr-second-operator-input" class="worker-input" placeholder="Nombre del segundo operario (ej. Yerson)">
           </div>
         </div>
 
@@ -151,22 +167,22 @@
         <div class="sr-field-group">
           <label class="worker-label">Método de pago</label>
           <div class="sr-payment-methods" id="sr-payment-methods">
-            <label class="sr-payment-option is-active">
+            <label class="sr-payment-option is-active" data-pay="Yape">
               <input type="radio" name="sr-payment" value="Yape" checked class="visually-hidden">
-              <span class="sr-pay-icon" style="background:#00d1b2">🟢</span>
+              <img src="icon-yape.png" alt="Yape" class="sr-pay-img">
               <span>Yape</span>
             </label>
-            <label class="sr-payment-option">
+            <label class="sr-payment-option" data-pay="Plin">
               <input type="radio" name="sr-payment" value="Plin" class="visually-hidden">
-              <span class="sr-pay-icon" style="background:#9b51e0">🟣</span>
+              <img src="icon-plin.png" alt="Plin" class="sr-pay-img">
               <span>Plin</span>
             </label>
-            <label class="sr-payment-option">
+            <label class="sr-payment-option" data-pay="Tarjeta">
               <input type="radio" name="sr-payment" value="Tarjeta" class="visually-hidden">
               <span class="sr-pay-icon" style="background:#2f80ed">💳</span>
               <span>Tarjeta</span>
             </label>
-            <label class="sr-payment-option">
+            <label class="sr-payment-option" data-pay="Efectivo">
               <input type="radio" name="sr-payment" value="Efectivo" class="visually-hidden">
               <span class="sr-pay-icon" style="background:#27ae60">💵</span>
               <span>Efectivo</span>
@@ -206,20 +222,18 @@
           <small class="worker-help" style="margin-top:4px;display:block">Si escribes una observación, se colocará automáticamente entre paréntesis al final.</small>
         </div>
 
-        <!-- VISTA PREVIA PARA WHATSAPP -->
+        <!-- VISTA PREVIA DEL MENSAJE -->
         <div class="sr-field-group">
-          <label class="worker-label">Mensaje para el grupo SPHASH SEDE LAS FLORES</label>
+          <label class="worker-label">Vista previa del mensaje</label>
           <pre class="sr-preview-box" id="sr-preview-text" aria-label="Vista previa del reporte"></pre>
         </div>
 
         <!-- BOTONES DE ACCION -->
         <div class="sr-submit-actions">
-          <button type="button" id="sr-submit-whatsapp" class="primary-button whatsapp-button" style="background:#25D366;color:#fff;border-color:#1EBE5D;display:flex;align-items:center;justify-content:center;gap:10px;font-size:1rem;font-weight:700;width:100%">
-            <span>📲 Mandar al grupo SPHASH SEDE LAS FLORES</span>
+          <button type="button" id="sr-submit-whatsapp" class="primary-button" style="background:#008c95;color:#fff;border-color:#00757d;display:flex;align-items:center;justify-content:center;gap:10px;font-size:1.05rem;font-weight:700;width:100%;padding:14px;border-radius:12px;box-shadow:0 4px 12px rgba(0,140,149,0.25)">
+            <span>Enviar</span>
           </button>
-          <button type="button" id="sr-save-only" class="secondary-action" style="margin-top:10px;width:100%">
-            Guardar solo en caja de administración
-          </button>
+          <button type="button" id="sr-save-only" hidden aria-hidden="true" style="display:none"></button>
         </div>
         <p id="sr-message" class="scan-status" role="status" aria-live="polite" style="margin-top:12px"></p>
       </form>
@@ -323,9 +337,9 @@
   </dialog>
 
   <script src="vendor/supabase.js"></script>
-  <script src="splash-api.js?v=1.1-tutor"></script>
+  <script src="splash-api.js?v=1.2-payicons"></script>
   <script src="vendor/jsQR.js"></script>
-  <script src="operarios.js?v=1.1-tutor"></script>
-  <script src="splash-tutor.js?v=1.1-tutor"></script>
+  <script src="operarios.js?v=1.2-payicons"></script>
+  <script src="splash-tutor.js?v=1.2-payicons"></script>
 </body>
 </html>

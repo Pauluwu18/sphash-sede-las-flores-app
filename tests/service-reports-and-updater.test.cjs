@@ -131,9 +131,11 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   amountChip150.click();
   assert.equal($('sr-amount-input').value, '150');
 
-  // 5. Probar método de pago Yape
+  // 5. Probar método de pago Yape y verificar iconos de Yape y Plin
   const yapeMethod = w.document.querySelector('input[name="sr-payment"][value="Yape"]');
   assert.ok(yapeMethod, 'Opción de pago Yape debe existir');
+  assert.ok(w.document.querySelector('img[src="icon-yape.png"]'), 'Icono oficial de Yape debe existir');
+  assert.ok(w.document.querySelector('img[src="icon-plin.png"]'), 'Icono oficial de Plin debe existir');
   yapeMethod.checked = true;
   yapeMethod.dispatchEvent(new w.Event('change'));
 
@@ -141,10 +143,24 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   $('sr-observation-input').value = 'se dio vuelto en yape';
   $('sr-observation-input').dispatchEvent(new w.Event('input'));
 
-  // 7. Verificar vista previa en vivo del mensaje de WhatsApp
-  const previewText = $('sr-preview-text').textContent.trim();
-  const expectedPreview = `Cuarto servicio\nOPERARIO: Yerson\nMONTO DEL SERVICIO: 150\nMETODO: Yape\n(se dio vuelto en yape)`;
-  assert.equal(previewText, expectedPreview, 'La vista previa debe coincidir exactamente con el formato solicitado por el usuario');
+  // 7. Verificar vista previa con 1 operario
+  let previewText = $('sr-preview-text').textContent.trim();
+  let expectedPreview = `Cuarto servicio\nOPERARIO: Yerson\nMONTO DEL SERVICIO: 150\nMETODO: Yape\n(se dio vuelto en yape)`;
+  assert.equal(previewText, expectedPreview, 'La vista previa debe coincidir con el formato para un operario');
+
+  // 7.1 Probar agregar segundo operario (cuando fueron 2 personas)
+  assert.ok($('sr-add-second-op-btn'), 'El botón para agregar segundo operario debe existir');
+  $('sr-add-second-op-btn').click();
+  assert.equal($('sr-second-op-wrap').hidden, false, 'El campo de segundo operario debe hacerse visible');
+  $('sr-second-operator-input').value = 'Paul';
+  $('sr-second-operator-input').dispatchEvent(new w.Event('input'));
+
+  previewText = $('sr-preview-text').textContent.trim();
+  expectedPreview = `Cuarto servicio\nOPERARIOS: Yerson y Paul\nMONTO DEL SERVICIO: 150\nMETODO: Yape\n(se dio vuelto en yape)`;
+  assert.equal(previewText, expectedPreview, 'La vista previa debe cambiar a OPERARIOS con ambos nombres');
+
+  // Verificar botón de envío (debe decir "Enviar")
+  assert.match($('sr-submit-whatsapp').textContent.trim(), /^Enviar$/i, 'El botón debe decir exactamente "Enviar"');
 
   // 8. Cargar foto del comprobante / dinero
   const fakeFile = new w.File(['photo-data'], 'comprobante.jpg', { type: 'image/jpeg' });
@@ -156,10 +172,10 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   $('sr-submit-whatsapp').click();
   await flush();
 
-  // Verificar llamada a Supabase cash_movements
+  // Verificar llamada a Supabase cash_movements con ambos operarios
   assert.equal(supabaseCalls.length, 1, 'Debe haber guardado el movimiento en Supabase');
   const savedMovement = supabaseCalls[0].body;
-  assert.equal(savedMovement.operator, 'Yerson');
+  assert.equal(savedMovement.operator, 'Yerson y Paul');
   assert.equal(savedMovement.amount, 150);
   assert.equal(savedMovement.service_number, 'Cuarto servicio');
   assert.equal(savedMovement.payment_method, 'Yape');
@@ -169,7 +185,7 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   // Verificar almacenamiento local para administración
   const localStore = JSON.parse(w.localStorage.getItem('splash-cash-records') || '{}');
   const todayRecords = Object.values(localStore).flat();
-  assert.ok(todayRecords.some((r) => r.operator === 'Yerson' && r.amount === 150 && r.service_number === 'Cuarto servicio'));
+  assert.ok(todayRecords.some((r) => r.operator === 'Yerson y Paul' && r.amount === 150 && r.service_number === 'Cuarto servicio'));
 
   // Verificar notificación con texto exacto requerido
   assert.equal(notifications.length, 1, 'Debe generar una notificación');
@@ -475,7 +491,7 @@ test('Tutor interactivo SPLASH: burbuja flotante, pasos con spotlight y menú r�
     w.splashTutor.nextStep();
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  assert.match($('splash-tutor-title').textContent, /Mandar al grupo/i);
+  assert.match($('splash-tutor-title').textContent, /Enviar/i);
 
   // 5. Finalizar el tutorial: celebración y guardado en localStorage
   w.splashTutor.nextStep(); // Paso final

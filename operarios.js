@@ -413,14 +413,19 @@
 
   function buildSrWhatsappText() {
     const service = ($('sr-service-input')?.value || '').trim() || 'Primer servicio';
-    const op = ($('sr-operator-input')?.value || $('sr-operator-display')?.textContent || '').trim();
+    const primaryOp = ($('sr-operator-input')?.value || $('sr-operator-display')?.textContent || currentWorker?.name || '').trim();
+    const secondOp = ($('sr-second-operator-input')?.value || '').trim();
+
+    const opLabel = secondOp ? 'OPERARIOS' : 'OPERARIO';
+    const opDisplay = secondOp ? `${primaryOp} y ${secondOp}` : primaryOp;
+
     const amountVal = $('sr-amount-input')?.value;
     const amountFormatted = amountVal ? formatMontoExact(amountVal) : '0';
     const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || 'Yape';
     const obsRaw = ($('sr-observation-input')?.value || '').trim();
     const obsClean = obsRaw ? obsRaw.replace(/^\(+|\)+$/g, '').trim() : '';
 
-    let text = `${service}\nOPERARIO: ${op}\nMONTO DEL SERVICIO: ${amountFormatted}\nMETODO: ${payMethod}`;
+    let text = `${service}\n${opLabel}: ${opDisplay}\nMONTO DEL SERVICIO: ${amountFormatted}\nMETODO: ${payMethod}`;
     if (obsClean) {
       text += `\n(${obsClean})`;
     }
@@ -433,7 +438,7 @@
   }
 
   // Listeners de actualización en tiempo real de la vista previa
-  ['sr-service-input', 'sr-amount-input', 'sr-observation-input', 'sr-operator-input'].forEach(id => {
+  ['sr-service-input', 'sr-amount-input', 'sr-observation-input', 'sr-operator-input', 'sr-second-operator-input'].forEach(id => {
     const el = $(id);
     if (el) {
       el.addEventListener('input', updateSrPreview);
@@ -475,15 +480,23 @@
     });
   });
 
-  // Alternar campo personalizado de operario
-  if ($('sr-toggle-op-btn')) {
-    $('sr-toggle-op-btn').addEventListener('click', () => {
-      const wrap = $('sr-operator-custom-wrap');
+  // Agregar o quitar segundo operario (si fueron en 2 personas)
+  if ($('sr-add-second-op-btn')) {
+    $('sr-add-second-op-btn').addEventListener('click', () => {
+      const wrap = $('sr-second-op-wrap');
       if (!wrap) return;
-      wrap.hidden = !wrap.hidden;
-      if (!wrap.hidden) {
-        $('sr-operator-input').focus();
-      }
+      wrap.hidden = false;
+      $('sr-second-operator-input')?.focus();
+      updateSrPreview();
+    });
+  }
+
+  if ($('sr-remove-second-op-btn')) {
+    $('sr-remove-second-op-btn').addEventListener('click', () => {
+      const wrap = $('sr-second-op-wrap');
+      if (wrap) wrap.hidden = true;
+      if ($('sr-second-operator-input')) $('sr-second-operator-input').value = '';
+      updateSrPreview();
     });
   }
 
@@ -625,11 +638,13 @@
       return;
     }
 
-    const operator = ($('sr-operator-input')?.value || $('sr-operator-display')?.textContent || '').trim();
-    if (!operator || operator === '—') {
+    const primaryOp = ($('sr-operator-input')?.value || $('sr-operator-display')?.textContent || currentWorker?.name || '').trim();
+    if (!primaryOp || primaryOp === '—') {
       alert('Indica el nombre del operario.');
       return;
     }
+    const secondOp = ($('sr-second-operator-input')?.value || '').trim();
+    const operator = secondOp ? `${primaryOp} y ${secondOp}` : primaryOp;
 
     const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || 'Yape';
     const obsRaw = ($('sr-observation-input')?.value || '').trim();
@@ -693,6 +708,8 @@
     // Resetear formulario para el siguiente servicio
     if ($('sr-amount-input')) $('sr-amount-input').value = '';
     if ($('sr-observation-input')) $('sr-observation-input').value = '';
+    if ($('sr-second-operator-input')) $('sr-second-operator-input').value = '';
+    if ($('sr-second-op-wrap')) $('sr-second-op-wrap').hidden = true;
     currentSrPhotoData = '';
     if ($('sr-photo-file')) $('sr-photo-file').value = '';
     if ($('sr-photo-preview-wrap')) $('sr-photo-preview-wrap').hidden = true;
