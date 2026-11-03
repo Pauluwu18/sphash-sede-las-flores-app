@@ -87,3 +87,4 @@ test('Visibilidad de tutor: oculto en login y visible en panel de operarios', as
   assert.ok(o$('checkin-switch-user-btn'), 'Debe existir el botón ¿No eres tú? Cambiar');
   assert.equal(o$('worker-dni').getAttribute('autocomplete'), 'off');
 });
+

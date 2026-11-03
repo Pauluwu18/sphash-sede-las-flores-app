@@ -624,6 +624,97 @@
     } catch (_) {}
   }
 
+  // Convertir DataURL a objeto File de forma síncrona sin latencia de red
+  function dataUrlToFile(dataUrl, filename) {
+    try {
+      if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.includes(',')) return null;
+      const parts = dataUrl.split(',');
+      const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, { type: mime });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Estampar detalles del servicio sobre el comprobante (para respaldo visual indudable)
+  function stampSrPhoto(dataUrl, line1, line2, subtext) {
+    return new Promise(resolve => {
+      if (!dataUrl || typeof Image === 'undefined') return resolve(dataUrl);
+      try {
+        const timer = setTimeout(() => resolve(dataUrl), 250);
+        const img = new Image();
+        img.onload = () => {
+          clearTimeout(timer);
+          try {
+            const canvas = document.createElement('canvas');
+            const maxW = 960;
+            let w = img.naturalWidth || img.width || 800;
+            let h = img.naturalHeight || img.height || 600;
+            if (w > maxW) {
+              h = Math.round((h * maxW) / w);
+              w = maxW;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(dataUrl);
+
+            ctx.drawImage(img, 0, 0, w, h);
+
+            const bannerHeight = Math.max(76, Math.round(h * 0.22));
+            const grad = ctx.createLinearGradient(0, h - bannerHeight - 20, 0, h);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(0.3, 'rgba(0, 0, 0, 0.72)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0.92)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, h - bannerHeight - 20, w, bannerHeight + 20);
+
+            const baseFontSize = Math.max(16, Math.round(w * 0.04));
+            ctx.font = `bold ${baseFontSize}px sans-serif`;
+            ctx.fillStyle = '#4ade80';
+            const padLeft = Math.round(w * 0.04);
+            const bottomPad = Math.round(h * 0.04);
+
+            const yLine1 = h - bottomPad - Math.round(baseFontSize * 1.6);
+            const yLine2 = h - bottomPad - Math.round(baseFontSize * 0.5);
+            const ySub = h - bottomPad + Math.round(baseFontSize * 0.5);
+
+            ctx.fillText(line1, padLeft, yLine1);
+
+            if (line2) {
+              ctx.font = `600 ${Math.round(baseFontSize * 0.85)}px sans-serif`;
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText(line2, padLeft, yLine2);
+            }
+
+            if (subtext) {
+              ctx.font = `500 ${Math.round(baseFontSize * 0.65)}px sans-serif`;
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillText(subtext, padLeft, ySub);
+            }
+
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } catch {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve(dataUrl);
+        };
+        img.src = dataUrl;
+      } catch {
+        resolve(dataUrl);
+      }
+    });
+  }
+
   // Guardar y enviar servicio
   async function submitServiceReport(sendToWhatsapp = true) {
     const amountVal = $('sr-amount-input')?.value;
@@ -655,6 +746,30 @@
     const date = getTodayString();
     const time = getTimeString();
 
+    // Si la cámara en vivo estaba encendida pero no presionó "Capturar foto", capturarla automáticamente
+    if (!currentSrPhotoData && srCameraStream) {
+      captureSrLiveFrame();
+    }
+
+    // Advertencia amigable si olvidó adjuntar foto
+    if (!currentSrPhotoData) {
+      const confirmNoPhoto = confirm('⚠️ No has tomado ni subido una foto del billete o comprobante.\n\n¿Deseas enviar el reporte sin foto?');
+      if (!confirmNoPhoto) return;
+    }
+
+    // Preparar foto con estampado de seguridad si existe
+    let photoToSend = currentSrPhotoData || '';
+    if (photoToSend) {
+      try {
+        photoToSend = await stampSrPhoto(
+          photoToSend,
+          `ENTRADA: S/ ${formatMontoExact(amount)}`,
+          `${service} - ${payMethod}`,
+          `Operario: ${operator} | ${date} ${time}${obsClean ? ' (' + obsClean + ')' : ''}`
+        );
+      } catch (_) {}
+    }
+
     const movement = {
       id: 'sr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       date,
@@ -665,26 +780,24 @@
       payment_method: payMethod,
       observation: obsClean,
       concept: `${service} - ${payMethod}${obsClean ? ' (' + obsClean + ')' : ''}`,
-      photo: currentSrPhotoData || '',
+      photo: photoToSend,
       time,
       timestamp: Date.now()
     };
 
-    // 1. Guardar en Supabase (tabla cash_movements)
-    try {
-      await fetch(`${Splash.url}/rest/v1/cash_movements`, {
-        method: 'POST',
-        headers: {
-          apikey: Splash.key,
-          Authorization: `Bearer ${Splash.key}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal'
-        },
-        body: JSON.stringify(movement)
-      });
-    } catch (err) {
+    // 1. Guardar en Supabase en segundo plano (para no bloquear el gesto del usuario al compartir a WhatsApp)
+    fetch(`${Splash.url}/rest/v1/cash_movements`, {
+      method: 'POST',
+      headers: {
+        apikey: Splash.key,
+        Authorization: `Bearer ${Splash.key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify(movement)
+    }).catch(err => {
       console.warn('No se pudo sincronizar directamente con Supabase (se mantiene local):', err);
-    }
+    });
 
     // 2. Guardar en localStorage de caja (compatible con reportes de administración)
     try {
@@ -703,7 +816,7 @@
       $('sr-message').classList.add('is-success');
     }
 
-    // 3. Enviar a WhatsApp si corresponde
+    // 3. Compartir inmediatamente mientras el gesto de clic del usuario está 100% activo
     if (sendToWhatsapp) {
       await shareSrToWhatsApp(movement, whatsappMessage);
     }
@@ -722,24 +835,22 @@
   async function shareSrToWhatsApp(movement, text) {
     const photoData = movement.photo || '';
 
-    // En APK Android con interfaz SplashAndroid nativa
+    // 1. En APK Android con interfaz SplashAndroid nativa
     if (window.SplashAndroid?.shareToWhatsApp) {
       window.SplashAndroid.shareToWhatsApp(photoData, text);
       return;
     }
-    // Si corre en APK con interfaz SplashAdminNative
+    // 2. Si corre en APK con interfaz SplashAdminNative
     if (window.SplashAdminNative?.shareToWhatsApp) {
       window.SplashAdminNative.shareToWhatsApp(photoData, text);
       return;
     }
 
-    // Web con soporte navigator.share con archivos
+    // 3. Web móvil con soporte Web Share API nativo (gesto activo, conversión síncrona de archivo)
     if (photoData) {
       try {
-        const res = await fetch(photoData);
-        const blob = await res.blob();
-        const file = new File([blob], `comprobante_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        const file = dataUrlToFile(photoData, `comprobante_${Date.now()}.jpg`);
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             text,
@@ -750,13 +861,25 @@
       } catch (err) {
         if (err.name === 'AbortError') return;
       }
+
+      // Si navigator.share con archivos no está soportado o falló:
+      // Descargamos la imagen automáticamente para que quede primera en la galería de WhatsApp
+      try {
+        const dl = document.createElement('a');
+        dl.href = photoData;
+        dl.download = `comprobante_servicio_${Date.now()}.jpg`;
+        document.body.appendChild(dl);
+        dl.click();
+        document.body.removeChild(dl);
+      } catch (_) {}
     }
 
-    // Enlace directo wa.me compatible con cualquier versión de WebView
+    // 4. Enlace directo wa.me compatible con cualquier versión de navegador/WebView
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     try {
-      window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.location.href = waUrl;
     } catch (_) {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
     }
   }
 

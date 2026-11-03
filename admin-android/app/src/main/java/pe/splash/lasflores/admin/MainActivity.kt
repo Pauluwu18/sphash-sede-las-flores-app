@@ -1,4 +1,4 @@
-﻿package pe.splash.lasflores.admin
+package pe.splash.lasflores.admin
 
 import android.Manifest
 import android.app.DownloadManager
@@ -346,6 +346,7 @@ class MainActivity : Activity() {
                             type = "image/jpeg"
                             putExtra(Intent.EXTRA_STREAM, contentUri)
                             putExtra(Intent.EXTRA_TEXT, messageText)
+                            clipData = android.content.ClipData.newRawUri("reporte", contentUri)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
 
@@ -357,10 +358,16 @@ class MainActivity : Activity() {
                         }
 
                         if (waPackage != null) {
+                            try {
+                                grantUriPermission(waPackage, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            } catch (_: Exception) {}
                             intent.setPackage(waPackage)
                             startActivity(intent)
                         } else {
-                            startActivity(Intent.createChooser(intent, "Compartir reporte en WhatsApp"))
+                            val chooser = Intent.createChooser(intent, "Compartir reporte en WhatsApp").apply {
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            startActivity(chooser)
                         }
                     } else {
                         val intent = Intent(Intent.ACTION_VIEW).apply {
