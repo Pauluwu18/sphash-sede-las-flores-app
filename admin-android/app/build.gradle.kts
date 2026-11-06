@@ -8,6 +8,11 @@ val firebaseConfig = Properties().apply {
     val configFile = rootProject.file("firebase.properties")
     if (configFile.exists()) configFile.inputStream().use(::load)
 }
+val firebaseNames = listOf("FIREBASE_PROJECT_ID", "FIREBASE_SENDER_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY")
+val allowUnconfiguredFirebase = providers.gradleProperty("allowUnconfiguredFirebase").orNull == "true"
+check(allowUnconfiguredFirebase || firebaseNames.all { !firebaseConfig.getProperty(it).isNullOrBlank() }) {
+    "Falta firebase.properties: no se genera una APK sin avisos. Para CI solamente usa -PallowUnconfiguredFirebase=true."
+}
 fun configValue(name: String): String =
     "\"" + (firebaseConfig.getProperty(name) ?: "").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -20,14 +25,33 @@ android {
         applicationId = "pe.splash.lasflores.admin"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 8
+        versionName = "1.7"
         buildConfigField("String", "SITE_ORIGIN", "\"https://pauluwu18.github.io\"")
         buildConfigField("String", "SITE_URL", "\"https://pauluwu18.github.io/sphash-sede-las-flores-app/\"")
         for (name in listOf("FIREBASE_PROJECT_ID", "FIREBASE_SENDER_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY")) {
             buildConfigField("String", name, configValue(name))
         }
     }
+    signingConfigs {
+        create("release") {
+            storeFile = file("splash.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("release")
+        }
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
+
     buildFeatures { buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -38,4 +62,5 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
     implementation("com.google.firebase:firebase-messaging")
+    implementation("androidx.core:core-ktx:1.15.0")
 }

@@ -9,8 +9,22 @@ window.AdminQR = {
   render(query = '') {
     const search = query.trim().toLocaleLowerCase();
     peopleList.innerHTML = this.people.filter(p => `${p.name} ${p.dni || ''}`.toLocaleLowerCase().includes(search)).map(p =>
-      `<div class="people-item"><div class="people-item-name"><strong>${Splash.escape(p.name)}</strong><small>${Splash.escape(p.dni || 'DNI pendiente')} · ${p.active ? (p.has_pin ? 'PIN creado' : 'Sin PIN') : 'Inactivo'}</small></div><div class="people-item-actions"><button type="button" data-profile="${p.id}">Perfil</button>${p.active ? `<button type="button" data-use-profile="${p.id}">Usar</button>` : ''}</div></div>`
+      `<div class="people-item"><div class="people-item-name"><strong>${Splash.escape(p.name)}</strong><small>${Splash.escape(p.dni || 'DNI pendiente')} · ${p.active ? (p.has_pin ? 'PIN creado' : 'Sin PIN') : 'Inactivo'}</small></div><div class="people-item-actions"><button type="button" data-profile="${p.id}">Perfil</button>${p.active ? `<button type="button" data-use-profile="${p.id}">Usar</button>` : ''}<button type="button" class="people-delete" data-delete-person="${p.id}" data-person-name="${Splash.escape(p.name)}">Eliminar</button></div></div>`
     ).join('') || '<p class="people-empty">No hay personas que coincidan.</p>';
+  },
+  async delete(id, name) {
+    const personName = name || 'esta persona';
+    if (!window.confirm(`¿Eliminar a «${personName}» de las personas registradas? Se cerrará su acceso. Sus asistencias anteriores se conservarán.`)) return;
+    if (this.deleting) return;
+    this.deleting = true;
+    try {
+      await Splash.call('delete_person', { id });
+      await this.refresh();
+      const profileDlg = document.getElementById('profile-dialog');
+      if (profileDlg && profileDlg.open) profileDlg.close();
+      showToast(`«${personName}» fue eliminado.`);
+    } catch (error) { showToast(error.message || 'No se pudo eliminar a la persona.'); }
+    finally { this.deleting = false; }
   },
   async add() {
     const name = buildFullPersonName(personFirstName.value, personLastName.value);
@@ -32,6 +46,8 @@ window.AdminQR = {
     $('profile-id').value = p.id;
     $('profile-name').value = p.name;
     $('profile-dni').value = p.dni || '';
+    $('profile-dni').required = !!p.dni;
+    $('profile-dni-help').textContent = p.dni ? 'El DNI registrado debe conservar 8 dígitos.' : 'Si aún no tiene DNI registrado, puedes guardar su perfil sin completarlo.';
     $('profile-type').value = p.type;
     $('profile-active').checked = p.active;
     $('profile-pin').textContent = p.has_pin ? 'PIN creado. Pulsa «Consultar PIN» para verlo.' : 'El operario aún no creó su PIN.';
@@ -43,6 +59,15 @@ window.AdminQR = {
 
 (() => {
   const $ = id => document.getElementById(id);
+  window.addEventListener('splash-push-status', event => {
+    $('admin-push-status').hidden = false;
+    $('admin-push-status').textContent = event.detail;
+  });
+  const voiceButton = $('admin-voice-settings');
+  if (window.SplashAdminNative?.configureVoice) {
+    voiceButton.hidden = false;
+    voiceButton.addEventListener('click', () => window.SplashAdminNative.configureVoice());
+  }
   $('profile-close').addEventListener('click', () => $('profile-dialog').close());
   $('profile-dialog').addEventListener('close', () => { $('profile-pin').textContent = ''; });
   $('profile-form').addEventListener('submit', async event => {
@@ -73,6 +98,15 @@ window.AdminQR = {
       document.querySelector(`input[name="person-type"][value="${p.type}"]`).checked = true;
       peopleDialog.close(); input.focus();
     }
+    const del = event.target.closest('[data-delete-person]');
+    if (del) {
+      AdminQR.delete(del.dataset.deletePerson, del.dataset.personName);
+    }
+  });
+  $('profile-delete')?.addEventListener('click', () => {
+    const id = $('profile-id').value;
+    const name = $('profile-name').value;
+    if (id) AdminQR.delete(id, name);
   });
 
   let qrURL = '';
@@ -121,15 +155,47 @@ window.AdminQR = {
     const link = document.createElement('a'); link.download = 'QR-SPLASH-LAS-FLORES.png'; link.href = poster.toDataURL('image/png'); link.click();
   });
   $('admin-logout').addEventListener('click', async () => {
-    try { if (qrEnabled) await Splash.call('logout'); } catch { /* Siempre cerrar la sesión local. */ }
-    sessionStorage.removeItem('splash-admin-session'); location.reload();
+    if (window.SplashAdminNative?.disableNotifications) window.SplashAdminNative.disableNotifications();
+    const revocation = qrEnabled ? Splash.call('logout') : Promise.resolve();
+    Splash.clearAdminSession();
+    loginScreen.hidden = false;
+    try { await revocation; } catch { /* El acceso local ya está cerrado. */ }
+    location.reload();
   });
   window.addEventListener('splash-session-expired', event => {
     if (event.detail !== 'admin') return;
+    localStorage.removeItem('splash-admin-persist');
     document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
     loginScreen.hidden = false; loginMessage.textContent = 'Tu sesión venció. Vuelve a iniciar sesión.';
   });
   const stopWatching = Splash.watchAttendance(() => { if (qrEnabled && loginScreen.hidden) loadCurrentRecord(false); });
   window.addEventListener('pagehide', stopWatching);
   setInterval(() => { if (qrEnabled && loginScreen.hidden && peopleDialog.open && !$('profile-dialog').open) AdminQR.refresh().catch(error => showToast(error.message)); }, 3000);
+  async function restoreAdminSession() {
+    if (/Android/i.test(navigator.userAgent) && !window.SplashAdminNative) return;
+    const token = Splash.adminSession();
+    if (!token) return;
+    $('keep-session').checked = !!(localStorage.getItem('splash-admin-session') || localStorage.getItem('splash-admin-persist'));
+    // Older APKs read this key directly to register push notifications.
+    sessionStorage.setItem('splash-admin-session', token);
+    const submit = loginForm.querySelector('[type="submit"]');
+    submit.disabled = true;
+    loginMessage.textContent = 'Comprobando tu sesión…';
+    try {
+      await AdminQR.refresh();
+      if (Splash.adminSession() !== token) return;
+      qrEnabled = true;
+      peopleResetButton.hidden = true;
+      loginScreen.hidden = true;
+      loginMessage.textContent = '';
+      if (window.SplashAdminNative?.enableNotifications) window.SplashAdminNative.enableNotifications();
+      await loadCurrentRecord(true);
+      await renderHistory();
+    } catch (error) {
+      loginScreen.hidden = false;
+      loginMessage.textContent = error.code === 'SESSION' ? 'Tu sesión venció. Vuelve a iniciar sesión.' :
+        'No se pudo comprobar tu sesión. Revisa la conexión y vuelve a abrir la app, o inicia sesión.';
+    } finally { submit.disabled = false; }
+  }
+  restoreAdminSession();
 })();

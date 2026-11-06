@@ -74,8 +74,6 @@ class MainActivity : Activity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 if (!isSitePage(Uri.parse(url))) return
-                // The existing admin page uses window.print() and a PNG data URL download.
-                // Intercept only those two actions; the web app and Supabase calls stay intact.
                 view.evaluateJavascript(
                     """(function(){
                       if(window.__splashAndroidReady)return;
@@ -117,7 +115,7 @@ class MainActivity : Activity() {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "image/*"
                     }
-                    startActivityForResult(Intent.createChooser(intent, "Seleccionar foto del QR"), fileChooserCode)
+                    startActivityForResult(Intent.createChooser(intent, "Seleccionar foto del QR o comprobante"), fileChooserCode)
                     true
                 } catch (_: Exception) {
                     fileCallback?.onReceiveValue(null)
@@ -206,6 +204,15 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun isAppInstalled(packageName: String, packageManager: PackageManager): Boolean {
+        return try {
+            packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
     private inner class SiteActions {
         @JavascriptInterface fun printPage() {
             mainHandler.post {
@@ -222,6 +229,87 @@ class MainActivity : Activity() {
             mainHandler.post {
                 if (isSitePage(Uri.parse(webView.url ?: ""))) saveQr(dataUrl)
             }
+        }
+
+        @JavascriptInterface fun shareToWhatsApp(base64Data: String, messageText: String) {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                try {
+                    val cleanBase64 = if (base64Data.contains(',')) base64Data.substringAfter(',') else base64Data
+                    val isImage = cleanBase64.isNotBlank() && cleanBase64.length > 100
+
+                    if (isImage) {
+                        val reportsDir = File(cacheDir, "reports").apply { mkdirs() }
+                        val reportFile = File(reportsDir, "reporte_servicio_${System.currentTimeMillis()}.jpg")
+                        val bytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+                        reportFile.writeBytes(bytes)
+
+                        val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "${packageName}.fileprovider",
+                            reportFile
+                        )
+
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/jpeg"
+                            putExtra(Intent.EXTRA_STREAM, contentUri)
+                            putExtra(Intent.EXTRA_TEXT, messageText)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        val pm = packageManager
+                        val waPackage = when {
+                            isAppInstalled("com.whatsapp", pm) -> "com.whatsapp"
+                            isAppInstalled("com.whatsapp.w4b", pm) -> "com.whatsapp.w4b"
+                            else -> null
+                        }
+
+                        if (waPackage != null) {
+                            intent.setPackage(waPackage)
+                            startActivity(intent)
+                        } else {
+                            startActivity(Intent.createChooser(intent, "Compartir reporte en WhatsApp"))
+                        }
+                    } else {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("https://api.whatsapp.com/send?text=" + Uri.encode(messageText))
+                        }
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    toast("No se pudo abrir WhatsApp: ${e.message}")
+                }
+            }
+        }
+
+        @JavascriptInterface fun downloadAndInstallApk(apkUrl: String) {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                try {
+                    if (apkUrl.isBlank()) return@post
+                    toast("Iniciando descarga de actualización...")
+                    val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
+                        setTitle("Actualización SPLASH")
+                        setDescription("Descargando nueva versión...")
+                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "SPLASH-Operarios-Update.apk")
+                        setMimeType("application/vnd.android.package-archive")
+                    }
+                    val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    dm.enqueue(request)
+                    toast("Descarga iniciada. Revisa tus notificaciones para instalar.")
+                } catch (e: Exception) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
+                    } catch (_: Exception) {
+                        toast("No se pudo descargar la actualización.")
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface fun getAppVersion(): String {
+            return "${BuildConfig.VERSION_NAME}:${BuildConfig.VERSION_CODE}"
         }
     }
 

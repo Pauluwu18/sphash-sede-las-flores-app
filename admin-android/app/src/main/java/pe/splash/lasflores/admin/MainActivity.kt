@@ -1,7 +1,15 @@
-package pe.splash.lasflores.admin
+﻿package pe.splash.lasflores.admin
 
 import android.Manifest
+import android.app.DownloadManager
+import android.webkit.PermissionRequest
+import android.webkit.URLUtil
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.NotificationManager
+import android.provider.Settings
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -36,9 +44,19 @@ class MainActivity : Activity() {
     private val sitePrefix = Uri.parse(BuildConfig.SITE_URL).path!!.trimEnd('/') + "/"
     private var resumed = false
     private var registeredForPage = false
+    private var registeredSession: String? = null
+    private var lastRegistration = 0L
+    private var pendingExcel: ByteArray? = null
+    private val excelRequestCode = 11
+    private var cameraRequest: PermissionRequest? = null
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private val cameraPermissionCode = 1001
+    private val fileChooserCode = 1002
+    private val excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     private var registering = false
     private var registrationNonce: String? = null
     private var notificationPermissionRequested = false
+    private var soundSettingsExplained = false
     private val notificationPermissionCode = 10
     private val poll = object : Runnable {
         override fun run() {
@@ -54,18 +72,26 @@ class MainActivity : Activity() {
         window.navigationBarColor = Color.rgb(16, 42, 67)
         webView = WebView(this)
         setContentView(webView, FrameLayout.LayoutParams(-1, -1))
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
+                if (webView.canGoBack()) webView.goBack() else finish()
+            }
+        }
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false)
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             allowFileAccess = false
-            allowContentAccess = false
+            allowContentAccess = true
+            mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
-        webView.addJavascriptInterface(SiteActions(), "SplashAdminNative")
+        val actions = SiteActions()
+        webView.addJavascriptInterface(actions, "SplashAdminNative")
+        webView.addJavascriptInterface(actions, "SplashAndroid")
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (!request.isForMainFrame) return false
@@ -78,6 +104,7 @@ class MainActivity : Activity() {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                denyCameraRequest()
                 registeredForPage = false
                 registering = false
                 registrationNonce = null
@@ -85,6 +112,7 @@ class MainActivity : Activity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 if (!isSitePage(Uri.parse(url))) return
+                getSharedPreferences("app", MODE_PRIVATE).edit().putString("last_url", url).apply()
                 view.evaluateJavascript(
                     """(function(){
                       if(window.__splashAdminNativeReady)return;
@@ -106,6 +134,36 @@ class MainActivity : Activity() {
                 if (request.isForMainFrame) toast("No se pudo cargar el sitio. Comprueba tu conexión.")
             }
         }
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest) {
+                mainHandler.post { handleCameraRequest(request) }
+            }
+
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                mainHandler.post { if (cameraRequest === request) cameraRequest = null }
+            }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = filePathCallback
+                return try {
+                    val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "image/*"
+                    }
+                    startActivityForResult(intent, fileChooserCode)
+                    true
+                } catch (_: Exception) {
+                    fileCallback?.onReceiveValue(null)
+                    fileCallback = null
+                    false
+                }
+            }
+        }
         webView.setDownloadListener { url, _, _, _, _ ->
             if (isSitePage(Uri.parse(webView.url ?: "")) && url.startsWith("data:image/png;base64,")) saveQr(url)
         }
@@ -113,67 +171,275 @@ class MainActivity : Activity() {
         else webView.restoreState(savedInstanceState)
     }
 
+    private fun isAllowedOrigin(origin: Uri?): Boolean {
+        if (origin == null) return false
+        val originStr = origin.toString().trimEnd('/')
+        if (originStr == BuildConfig.SITE_ORIGIN) return true
+        val originHost = origin.host ?: return false
+        val targetHost = Uri.parse(BuildConfig.SITE_ORIGIN).host ?: return false
+        return originHost.equals(targetHost, ignoreCase = true)
+    }
+
+    private fun handleCameraRequest(request: PermissionRequest) {
+        denyCameraRequest()
+        if (!isAllowedOrigin(request.origin) ||
+            !isSitePage(Uri.parse(webView.url ?: "")) ||
+            !request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+        ) {
+            request.deny()
+            return
+        }
+        cameraRequest = request
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            grantCameraRequest()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraPermissionCode)
+        }
+    }
+
+    private fun grantCameraRequest() {
+        val request = cameraRequest ?: return
+        cameraRequest = null
+        if (isAllowedOrigin(request.origin) &&
+            isSitePage(Uri.parse(webView.url ?: "")) &&
+            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        ) request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+        else request.deny()
+    }
+
+    private fun denyCameraRequest() {
+        cameraRequest?.deny()
+        cameraRequest = null
+    }
+
     private fun isSitePage(uri: Uri): Boolean =
         uri.scheme == "https" && uri.host == Uri.parse(BuildConfig.SITE_ORIGIN).host &&
             (uri.path == sitePrefix.dropLast(1) || (uri.path ?: "").startsWith(sitePrefix))
 
     private fun checkAdminSession() {
-        if (!resumed || registeredForPage || registering || !isSitePage(Uri.parse(webView.url ?: ""))) return
-        if (FirebaseApp.getApps(this).isEmpty()) return
-        webView.evaluateJavascript("!!sessionStorage.getItem('splash-admin-session')") { hasSession ->
-            if (!resumed || hasSession != "true" || registeredForPage || registering) return@evaluateJavascript
+        if (!resumed || registering || !isSitePage(Uri.parse(webView.url ?: ""))) return
+        if (!getSharedPreferences("push", MODE_PRIVATE).getBoolean("notifications_enabled", true)) return
+        if (FirebaseApp.getApps(this).isEmpty()) {
+            pushStatus("Esta APK no tiene configurado Firebase. Instala la versión configurada.")
+            return
+        }
+        webView.evaluateJavascript("window.Splash?.adminSession ? Splash.adminSession() : (sessionStorage.getItem('splash-admin-session') || '')") { session ->
+            if (!resumed || registering || !isSitePage(Uri.parse(webView.url ?: ""))) return@evaluateJavascript
+            if (session == "\"\"" || session == "null") {
+                registeredForPage = false
+                registeredSession = null
+                return@evaluateJavascript
+            }
+            val needsRegistration = getSharedPreferences("push", MODE_PRIVATE).getBoolean("needs_registration", false)
+            if (registeredForPage && registeredSession == session && !needsRegistration &&
+                System.currentTimeMillis() - lastRegistration < 60_000) return@evaluateJavascript
             if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
             ) {
+                pushStatus("Activa el permiso de notificaciones de Android para recibir las asistencias.")
                 if (!notificationPermissionRequested) {
                     notificationPermissionRequested = true
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), notificationPermissionCode)
                 }
                 return@evaluateJavascript
             }
+            explainSilentChannel()
+            if (!(getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).areNotificationsEnabled()) {
+                pushStatus("Las notificaciones están desactivadas en los ajustes de Android.")
+                return@evaluateJavascript
+            }
             registering = true
+            registeredSession = session
+            val attempt = UUID.randomUUID().toString()
+            registrationNonce = attempt
+            // Recover even if the WebView request never completes (offline / navigation).
+            mainHandler.postDelayed({
+                if (registering && registrationNonce == attempt) {
+                    registering = false
+                    registrationNonce = null
+                    pushStatus("No se pudo confirmar el registro de avisos. Reintentando…")
+                }
+            }, 20_000)
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (registrationNonce != attempt) return@addOnCompleteListener
                 if (!resumed || !task.isSuccessful || task.result.isNullOrBlank()) {
                     registering = false
+                    pushStatus("No se pudo conectar con Firebase. Comprueba tu conexión y Google Play Services.")
                     return@addOnCompleteListener
                 }
-                registerToken(task.result)
+                if (isSitePage(Uri.parse(webView.url ?: ""))) registerToken(task.result, attempt, session)
+                else registering = false
             }
         }
     }
 
-    private fun registerToken(fcmToken: String) {
-        val nonce = UUID.randomUUID().toString()
-        registrationNonce = nonce
+    private fun registerToken(fcmToken: String, nonce: String, sessionLiteral: String) {
         val tokenLiteral = JSONObject.quote(fcmToken)
         val nonceLiteral = JSONObject.quote(nonce)
         webView.evaluateJavascript(
             """(async function(){
-              let success=false;
+              let success=false, error='No se pudo registrar este dispositivo. Revisa la conexión y la configuración de avisos.';
               try {
-                const session=sessionStorage.getItem('splash-admin-session');
-                if(session && window.Splash){
-                  const response=await fetch(Splash.url+'/rest/v1/rpc/splash_push_registration',{
+                const session=window.Splash?.adminSession ? Splash.adminSession() : sessionStorage.getItem('splash-admin-session');
+                if(session && session===$sessionLiteral && window.Splash){
+                  const response=await fetch(Splash.url+'/rest/v1/rpc/splash_push_registration_voice',{
                     method:'POST',
                     headers:{apikey:Splash.key,Authorization:'Bearer '+Splash.key,'Content-Type':'application/json'},
                     body:JSON.stringify({action:'register',session_token:session,device_token:$tokenLiteral})
                   });
                   const result=await response.json();
                   success=response.ok && result.ok===true;
+                  if(result.error) error=result.error;
                 }
               } catch (_) {}
-              SplashAdminNative.registrationResult($nonceLiteral,success);
+              SplashAdminNative.registrationResult($nonceLiteral,success,error);
             })();""".trimIndent(), null
         )
     }
 
+    private fun explainSilentChannel() {
+        if (Build.VERSION.SDK_INT < 26 || soundSettingsExplained) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = manager.getNotificationChannel("attendance") ?: return
+        if (manager.areNotificationsEnabled() && channel.importance >= NotificationManager.IMPORTANCE_DEFAULT && channel.sound != null) return
+        soundSettingsExplained = true
+        AlertDialog.Builder(this).setTitle("Activa el sonido de las asistencias")
+            .setMessage("Android tiene estos avisos bloqueados o en silencio. En Asistencias QR, permite las notificaciones y elige un sonido.")
+            .setPositiveButton("Abrir ajustes") { _, _ ->
+                startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    putExtra(Settings.EXTRA_CHANNEL_ID, "attendance")
+                })
+            }.setNegativeButton("Ahora no", null).show()
+    }
+
+    private fun isAppInstalled(pkg: String, pm: PackageManager): Boolean {
+        return try {
+            pm.getPackageInfo(pkg, 0)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private inner class SiteActions {
-        @JavascriptInterface fun registrationResult(nonce: String, success: Boolean) {
+        @JavascriptInterface fun shareToWhatsApp(base64Data: String, messageText: String) {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                try {
+                    val cleanBase64 = if (base64Data.contains(',')) base64Data.substringAfter(',') else base64Data
+                    val isImage = cleanBase64.isNotBlank() && cleanBase64.length > 100
+
+                    if (isImage) {
+                        val reportsDir = File(cacheDir, "reports").apply { mkdirs() }
+                        val reportFile = File(reportsDir, "reporte_caja_${System.currentTimeMillis()}.jpg")
+                        val bytes = Base64.decode(cleanBase64, Base64.DEFAULT)
+                        reportFile.writeBytes(bytes)
+
+                        val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "${packageName}.fileprovider",
+                            reportFile
+                        )
+
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/jpeg"
+                            putExtra(Intent.EXTRA_STREAM, contentUri)
+                            putExtra(Intent.EXTRA_TEXT, messageText)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        val pm = packageManager
+                        val waPackage = when {
+                            isAppInstalled("com.whatsapp", pm) -> "com.whatsapp"
+                            isAppInstalled("com.whatsapp.w4b", pm) -> "com.whatsapp.w4b"
+                            else -> null
+                        }
+
+                        if (waPackage != null) {
+                            intent.setPackage(waPackage)
+                            startActivity(intent)
+                        } else {
+                            startActivity(Intent.createChooser(intent, "Compartir reporte en WhatsApp"))
+                        }
+                    } else {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("https://wa.me/?text=" + Uri.encode(messageText))
+                        }
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    toast("Error al abrir WhatsApp: ${e.message}")
+                }
+            }
+        }
+        @JavascriptInterface fun requestCameraPermission() {
+            mainHandler.post {
+                if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraPermissionCode)
+                }
+            }
+        }
+        @JavascriptInterface fun configureVoice() {
+            mainHandler.post {
+                if (isSitePage(Uri.parse(webView.url ?: "")))
+                    startActivity(Intent(this@MainActivity, VoiceSettingsActivity::class.java))
+            }
+        }
+        @JavascriptInterface fun enableNotifications() {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                getSharedPreferences("push", MODE_PRIVATE).edit().putBoolean("notifications_enabled", true).apply()
+                registeredForPage = false
+                checkAdminSession()
+            }
+        }
+        @JavascriptInterface fun registrationResult(nonce: String, success: Boolean, error: String) {
             mainHandler.post {
                 if (nonce != registrationNonce || !isSitePage(Uri.parse(webView.url ?: ""))) return@post
                 registrationNonce = null
                 registering = false
                 registeredForPage = success
+                if (success) {
+                    lastRegistration = System.currentTimeMillis()
+                    getSharedPreferences("push", MODE_PRIVATE).edit()
+                        .putBoolean("needs_registration", false).putBoolean("notifications_enabled", true).apply()
+                }
+                val voiceSaved = getSharedPreferences("attendance_voice", MODE_PRIVATE).contains("voice_name")
+                pushStatus(if (!success) error else if (voiceSaved) "Avisos de asistencia activos." else
+                    "Avisos activos. En el menú, abre Configurar voz femenina para elegir y escuchar la voz.")
+            }
+        }
+
+        @JavascriptInterface fun disableNotifications() {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                registrationNonce = null
+                registering = false
+                registeredForPage = false
+                registeredSession = null
+                getSharedPreferences("push", MODE_PRIVATE).edit().putBoolean("notifications_enabled", false).apply()
+                stopService(Intent(this@MainActivity, AttendanceVoiceService::class.java))
+                (getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancelAll()
+            }
+        }
+
+        @JavascriptInterface fun saveExcel(filename: String, dataUrl: String) {
+            mainHandler.post {
+                if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
+                if (!filename.matches(Regex("Registro-Diario-\\d{4}-\\d{2}-\\d{2}\\.xlsx")) ||
+                    !dataUrl.startsWith("data:$excelMime;base64,") || dataUrl.length > 16_000_000) return@post
+                if (pendingExcel != null) { toast("Termina de guardar el archivo anterior."); return@post }
+                try {
+                    val bytes = Base64.decode(dataUrl.substringAfter(','), Base64.DEFAULT)
+                    if (bytes.size < 4 || bytes[0] != 80.toByte() || bytes[1] != 75.toByte()) return@post
+                    pendingExcel = bytes
+                    startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = excelMime
+                        putExtra(Intent.EXTRA_TITLE, filename)
+                    }, excelRequestCode)
+                } catch (_: Exception) { pendingExcel = null; toast("No se pudo preparar la descarga del Excel.") }
             }
         }
 
@@ -222,16 +488,57 @@ class MainActivity : Activity() {
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
-    @Deprecated("Uses WebView navigation history")
+    private fun pushStatus(message: String) {
+        if (!isSitePage(Uri.parse(webView.url ?: ""))) return
+        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('splash-push-status',{detail:${JSONObject.quote(message)}}))", null)
+    }
+
+    @Deprecated("Uses the platform document picker")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == fileChooserCode) {
+            val callback = fileCallback
+            fileCallback = null
+            if (callback == null) return
+            val results: Array<Uri>? = if (resultCode == RESULT_OK && data?.data != null) {
+                arrayOf(data.data!!)
+            } else null
+            callback.onReceiveValue(results)
+            return
+        }
+        if (requestCode != excelRequestCode) return
+        val bytes = pendingExcel
+        pendingExcel = null
+        if (resultCode != RESULT_OK || data?.data == null || bytes == null) return
+        try {
+            contentResolver.openOutputStream(data.data!!)?.use { it.write(bytes) }
+                ?: throw IllegalStateException("No se pudo abrir el archivo")
+            toast("Excel guardado correctamente.")
+        } catch (_: Exception) { toast("No se pudo guardar el Excel. Vuelve a descargarlo.") }
+    }
+
+    // Android 13+ uses the callback above; this handles older devices only.
+    @android.annotation.SuppressLint("GestureBackNavigation")
+    @Deprecated("Legacy back navigation for Android 12 and below")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != notificationPermissionCode) return
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) checkAdminSession()
-        else toast("Activa las notificaciones de esta app para recibir las asistencias.")
+        when (requestCode) {
+            notificationPermissionCode -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) checkAdminSession()
+                else toast("Activa las notificaciones de esta app para recibir las asistencias.")
+            }
+            cameraPermissionCode -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) grantCameraRequest()
+                else {
+                    denyCameraRequest()
+                    toast("Permiso de cámara denegado. Puedes intentarlo otra vez.")
+                }
+            }
+        }
     }
 
     override fun onResume() {

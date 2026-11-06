@@ -72,13 +72,21 @@ Deno.serve(async (request) => {
         headers: { ...jsonHeaders, Authorization: `Bearer ${bearer}` },
         body: JSON.stringify({ message: {
           token,
-          notification: {
-            title: "Nueva asistencia QR",
-            body: `Se registró una asistencia a las ${event.time}. Abre administración para verla.`,
+          data: {
+            kind: "attendance_voice",
+            event_id: event.event_id || `${payload.person_id}:${payload.work_date}`,
+            name: event.name || "Un operario",
+            time: event.time,
           },
-          android: { priority: "high", notification: { channel_id: "attendance" } },
+          android: { priority: "high", ttl: "300s" },
         } }),
       });
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        // Log only status codes, never device tokens or service-account material.
+        const code = failure?.error?.details?.find((item: { errorCode?: string }) => item.errorCode)?.errorCode;
+        console.error('FCM delivery failed', response.status, code || failure?.error?.status || 'UNKNOWN');
+      }
       return response.ok;
     }));
     if (results.every((sent) => !sent)) throw new Error("All FCM deliveries failed");

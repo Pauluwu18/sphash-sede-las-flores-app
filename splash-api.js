@@ -1,16 +1,29 @@
 /* La clave pública se configura al final de este archivo; nunca usar service_role. */
 window.Splash = {
+  adminSession() {
+    return sessionStorage.getItem('splash-admin-session') || localStorage.getItem('splash-admin-session') || '';
+  },
+  saveAdminSession(token, remember = false) {
+    this.clearAdminSession();
+    (remember ? localStorage : sessionStorage).setItem('splash-admin-session', token);
+  },
+  clearAdminSession() {
+    sessionStorage.removeItem('splash-admin-session');
+    localStorage.removeItem('splash-admin-session');
+  },
   async call(action, payload = {}, role = 'admin') {
+    const token = role === 'worker' ? localStorage.getItem('splash-worker-session') || '' : this.adminSession();
     const response = await fetch(`${this.url}/rest/v1/rpc/splash_api`, {
       method: 'POST',
       headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, payload, token: (role === 'worker' ? localStorage : sessionStorage).getItem(`splash-${role}-session`) || '' })
+      body: JSON.stringify({ action, payload, token })
     });
     const data = await response.json();
     if (!response.ok || data?.error) {
       const error = new Error(data?.error || (data?.code === 'PGRST202' ? 'Falta activar la migración QR en Supabase.' : 'No se pudo completar la operación.'));
       error.code = data?.code;
-      if (error.code === 'SESSION') {
+      if (error.code === 'SESSION' && token === (role === 'worker' ? localStorage.getItem('splash-worker-session') || '' : this.adminSession())) {
+        if (role === 'admin') this.clearAdminSession();
         sessionStorage.removeItem(`splash-${role}-session`);
         if (role === 'worker') localStorage.removeItem('splash-worker-session');
         window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: role }));

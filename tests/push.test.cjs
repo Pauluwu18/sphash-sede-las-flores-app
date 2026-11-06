@@ -22,6 +22,10 @@ test('solo sesiones admin reciben avisos por cada registro QR nuevo', async t =>
   await db.exec(fs.readFileSync('supabase-schema.sql', 'utf8'));
   await db.exec(fs.readFileSync('migrations/20260915_qr_attendance.sql', 'utf8'));
   await db.exec(fs.readFileSync('migrations/20260916_admin_push.sql', 'utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_push_lifetime.sql', 'utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_push_lifetime.sql', 'utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_remember_session.sql', 'utf8'));
+  await db.exec(fs.readFileSync('migrations/20261003_admin_remember_session.sql', 'utf8'));
   const initial = (await db.query('select password from splash_initial_access')).rows[0].password;
   const api = async (action, payload = {}, token = '') =>
     (await db.query('select public.splash_api($1,$2::jsonb,$3) result',
@@ -30,9 +34,16 @@ test('solo sesiones admin reciben avisos por cada registro QR nuevo', async t =>
     (await db.query('select public.splash_push_registration($1,$2,$3) result',
       [action, session, device])).rows[0].result;
   const admin = await api('admin_login', { username: 'admin', password: initial });
+  const hoursLeft = async token => Number((await db.query("select extract(epoch from (expires_at-now()))/3600 hours from splash_private.sessions where token_hash=encode(extensions.digest($1,'sha256'),'hex')",[token])).rows[0].hours);
+  const remembered=await api('admin_login',{username:'admin',password:initial,remember_session:true});
+  assert.ok(await hoursLeft(remembered.token)>719);
+  assert.ok(await hoursLeft(admin.token)<=12);
+  await api('logout',{},remembered.token);
+  assert.equal((await api('people',{},remembered.token)).code,'SESSION');
   const qr = (await api('qr', {}, admin.token)).token;
   const personId = (await api('save_person', { name: 'Operario aviso', dni: '00000999' }, admin.token)).id;
-  const worker = await api('activate', { dni: '00000999', pin: '0123', qr });
+  const worker = await api('activate', { dni: '00000999', pin: '0123', qr, remember_session:true });
+  assert.ok(await hoursLeft(worker.token)<=12, 'La casilla no extiende sesiones de operarios');
   const device = 'sample-fcm-device-token-for-admin-only-12345';
 
   assert.equal((await register('register', worker.token, device)).code, 'SESSION');
@@ -56,6 +67,23 @@ test('solo sesiones admin reciben avisos por cada registro QR nuevo', async t =>
   assert.deepEqual(event.tokens, [device]);
   assert.match(event.time, /^\d{2}:\d{2}$/);
 
-  await api('logout', {}, admin.token);
+  const getEvent = async () => (await db.query('select public.splash_push_event($1,$2::date) result',
+    [personId, requests[0].body.work_date])).rows[0].result;
+  await db.exec("update splash_private.sessions set expires_at=now()-interval '1 minute' where is_admin");
+  assert.deepEqual((await getEvent()).tokens,[device], 'Los avisos sobreviven a las 12 horas de la sesión web');
+  assert.equal((await register('register',admin.token,device)).code,'SESSION');
+  await db.exec('delete from splash_private.sessions where is_admin');
+  assert.deepEqual((await getEvent()).tokens,[device], 'La limpieza de sesiones no elimina la suscripción');
+  await db.exec("update splash_private.admin_push_devices set expires_at=now()-interval '1 minute'");
+  assert.deepEqual((await getEvent()).tokens,[], 'Una suscripción vencida no recibe avisos');
+  const renewed = await api('admin_login', { username:'admin', password:initial });
+  assert.equal((await register('register',renewed.token,device)).ok,true);
+  assert.deepEqual((await getEvent()).tokens,[device]);
+
+  await api('logout', {}, renewed.token);
   assert.equal((await db.query('select count(*)::int n from splash_private.admin_push_devices')).rows[0].n, 0);
+  const nextAdmin=await api('admin_login',{username:'admin',password:initial});
+  await register('register',nextAdmin.token,device);
+  await db.exec("update splash_private.settings set admin_hash=extensions.crypt('test-new-password',extensions.gen_salt('bf'))");
+  assert.deepEqual((await getEvent()).tokens,[], 'Cambiar la contraseña revoca todos los avisos');
 });

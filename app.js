@@ -18,6 +18,24 @@ function notifyAttendance(message) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   new Notification("SPLASH Control Operativo", { body: message, icon: "icon.png" });
 }
+function notifyCashRecord() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification("SPLASH Control Operativo", { body: "nuevo registro de caja", icon: "icon.png" });
+  } else if (Notification.permission === "default") {
+    try {
+      const res = Notification.requestPermission();
+      if (res && typeof res.then === "function") {
+        res.then((perm) => {
+          if (perm === "granted") {
+            new Notification("SPLASH Control Operativo", { body: "nuevo registro de caja", icon: "icon.png" });
+          }
+        }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+}
+
 
 async function attendanceFetch(path, options = {}) {
   const method = options.method || "GET";
@@ -102,6 +120,10 @@ passwordToggle.addEventListener("click", () => {
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (/Android/i.test(navigator.userAgent) && !window.SplashAdminNative) {
+    loginMessage.textContent = "El acceso administrativo está bloqueado en navegadores web de Android. Usa la APK de Administración.";
+    return;
+  }
   const username = document.querySelector("#login-user").value.trim();
   const password = document.querySelector("#login-password").value;
   const submit = loginForm.querySelector('[type="submit"]');
@@ -110,8 +132,10 @@ loginForm.addEventListener("submit", async (event) => {
   try {
     qrEnabled = await Splash.available();
     if (qrEnabled) {
-      const result = await Splash.call('admin_login', {username,password});
-      sessionStorage.setItem('splash-admin-session', result.token);
+      const remember = document.querySelector('#keep-session').checked;
+      const result = await Splash.call('admin_login', {username,password,remember_session:remember});
+      Splash.saveAdminSession(result.token, remember);
+      if (window.SplashAdminNative?.enableNotifications) window.SplashAdminNative.enableNotifications();
       await Splash.call('import_people', {names: registeredPeople});
       localStorage.removeItem('splash-registered-people');
       await AdminQR.refresh();
@@ -210,6 +234,25 @@ let pendingMissingNames = [];
 let pendingMissingReasons = {};
 let pendingSavePayload = null;
 let currentHistoryRecord = null;
+async function downloadDailyExcel(button, date) {
+  button.disabled = true;
+  try {
+    if (!qrEnabled) throw new Error('Inicia sesión con Supabase para descargar el registro.');
+    const [record, people] = await Promise.all([
+      Splash.call('records', {date}), Splash.call('people')
+    ]);
+    if (!record) throw new Error('No hay un registro guardado para esta fecha. Guarda las llegadas antes de descargar.');
+    await AttendanceExcel.download(record, people);
+  } catch (error) { showToast(error.message || 'No se pudo descargar el Excel.'); }
+  finally { button.disabled = false; }
+}
+document.querySelector('#download-current-excel').addEventListener('click', event => {
+  const date = new Intl.DateTimeFormat('es-PE', {day:'2-digit',month:'2-digit',year:'numeric',timeZone:'America/Lima'}).format(new Date());
+  downloadDailyExcel(event.currentTarget, date);
+});
+document.querySelector('#download-history-excel').addEventListener('click', event => {
+  if (currentHistoryRecord) downloadDailyExcel(event.currentTarget, currentHistoryRecord.date);
+});
 const inventoryTab = document.querySelector("#inventory-tab");
 const inventoryDrawer = document.querySelector("#inventory-drawer");
 const inventoryClose = document.querySelector("#inventory-close");
@@ -1185,3 +1228,1075 @@ refreshCurrentButton.addEventListener("click", () => {
 
 // Cargar al iniciar y luego cada 3 segundos
 setInterval(() => loadCurrentRecord(false), 3000);
+
+
+// =============================================================
+// REPORTES DE CAJA - CONTROL DE ENTRADAS Y SALIDAS DE DINERO
+// CON CÁMARA EN VIVO, MONTOS RÁPIDOS Y WHATSAPP
+// =============================================================
+const cashReportsButton = document.querySelector("#cash-reports-button");
+const cashReportsDialog = document.querySelector("#cash-reports-dialog");
+const cashReportsClose = document.querySelector("#cash-reports-close");
+const cashCalendar = document.querySelector("#cash-calendar");
+const cashReportDateLabel = document.querySelector("#cash-report-date-label");
+const cashTotalIncome = document.querySelector("#cash-total-income");
+const cashTotalExpense = document.querySelector("#cash-total-expense");
+const cashCountIncome = document.querySelector("#cash-count-income");
+const cashCountExpense = document.querySelector("#cash-count-expense");
+const cashBalance = document.querySelector("#cash-balance");
+const cashBalanceStatus = document.querySelector("#cash-balance-status");
+const cashMovementForm = document.querySelector("#cash-movement-form");
+const cashAmountInput = document.querySelector("#cash-amount");
+const cashAmountPills = document.querySelector("#cash-amount-pills");
+const cashOperatorInput = document.querySelector("#cash-operator");
+const cashOperatorSuggestions = document.querySelector("#cash-operator-suggestions");
+const cashQuickOperators = document.querySelector("#cash-quick-operators");
+const cashConceptInput = document.querySelector("#cash-concept");
+const cashConceptPills = document.querySelector("#cash-concept-pills");
+const cashReportPreview = document.querySelector("#cash-report-preview");
+const cashCopyButton = document.querySelector("#cash-copy-button");
+const cashWhatsappButton = document.querySelector("#cash-whatsapp-button");
+const cashMovementsList = document.querySelector("#cash-movements-list");
+const cashMovementsCount = document.querySelector("#cash-movements-count");
+
+// Controles de cámara en vivo y foto
+const cashOpenCameraBtn = document.querySelector("#cash-open-camera-btn");
+const cashCameraLiveWrap = document.querySelector("#cash-camera-live-wrap");
+const cashCameraVideo = document.querySelector("#cash-camera-video");
+const cashCameraCaptureBtn = document.querySelector("#cash-camera-capture-btn");
+const cashCameraCloseBtn = document.querySelector("#cash-camera-close-btn");
+const cashCameraButtons = document.querySelector("#cash-camera-buttons");
+const cashPhotoInput = document.querySelector("#cash-photo-input");
+const cashStampCheckbox = document.querySelector("#cash-stamp-checkbox");
+const cashPhotoPreviewWrap = document.querySelector("#cash-photo-preview-wrap");
+const cashPhotoPreviewImg = document.querySelector("#cash-photo-preview-img");
+const cashPhotoRemove = document.querySelector("#cash-photo-remove");
+const cashSubmitWhatsappBtn = document.querySelector("#cash-submit-whatsapp-btn");
+
+// Modal de visualización de foto
+const cashPhotoModal = document.querySelector("#cash-photo-modal");
+const cashPhotoModalImg = document.querySelector("#cash-photo-modal-img");
+const cashPhotoModalCaption = document.querySelector("#cash-photo-modal-caption");
+const cashPhotoModalClose = document.querySelector("#cash-photo-modal-close");
+const cashPhotoModalShare = document.querySelector("#cash-photo-modal-share");
+const cashPhotoModalDownload = document.querySelector("#cash-photo-modal-download");
+
+let activeCashDate = "";
+let currentCashPhotoData = "";
+let activeModalMovement = null;
+let cashCameraStream = null;
+
+function getCashRecordsStore() {
+  try {
+    return JSON.parse(localStorage.getItem("splash-cash-records") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveCashRecordsStore(store) {
+  try {
+    localStorage.setItem("splash-cash-records", JSON.stringify(store));
+  } catch {}
+}
+
+function getMovementsForDate(date) {
+  const store = getCashRecordsStore();
+  return store[date] || [];
+}
+
+function saveMovementsForDate(date, movements) {
+  const store = getCashRecordsStore();
+  store[date] = movements;
+  saveCashRecordsStore(store);
+}
+
+async function fetchCashMovementsFromSupabase(date) {
+  if (!date) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cash_movements?date=eq.${encodeURIComponent(date)}&order=created_at.asc`, {
+      headers: supabaseHeaders()
+    });
+    if (res.ok) {
+      const remote = await res.json();
+      if (Array.isArray(remote)) {
+        const store = getCashRecordsStore();
+        const local = store[date] || [];
+        const map = new Map();
+        local.forEach((m) => { if (m && m.id) map.set(m.id, m); });
+        remote.forEach((r) => {
+          if (!r || !r.id) return;
+          const existing = map.get(r.id) || {};
+          map.set(r.id, {
+            id: r.id,
+            date: r.date || date,
+            type: r.type || 'ENTRADA',
+            amount: Number(r.amount) || 0,
+            operator: r.operator || '',
+            service_number: r.service_number || '',
+            payment_method: r.payment_method || 'Efectivo',
+            observation: r.observation || '',
+            concept: r.concept || '',
+            photo: r.photo || existing.photo || '',
+            time: r.time || '',
+            timestamp: r.created_at ? new Date(r.created_at).getTime() : (existing.timestamp || Date.now())
+          });
+        });
+        store[date] = Array.from(map.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        saveCashRecordsStore(store);
+      }
+    }
+  } catch (err) {
+    console.warn("No se pudo sincronizar movimientos de caja con Supabase:", err);
+  }
+}
+
+function formatMontoExact(num) {
+  const n = Number(num) || 0;
+  return n % 1 === 0 ? String(n) : n.toFixed(2);
+}
+
+function formatMontoDisplay(num) {
+  const val = Number(num) || 0;
+  return `S/ ${val.toFixed(2)}`;
+}
+
+function formatCashMovement(m) {
+  if (m.service_number) {
+    const montoStr = formatMontoExact(m.amount);
+    const op = (m.operator || '').trim();
+    const payMethod = m.payment_method || 'Efectivo';
+    const obs = m.observation ? `\n(${m.observation})` : '';
+    let res = `${m.service_number}\nOPERARIO: ${op || 'Sin asignar'}\nMONTO DEL SERVICIO: ${montoStr}\nMETODO: ${payMethod}${obs}`;
+    return res;
+  }
+
+  const montoStr = formatMontoExact(m.amount);
+  const op = (m.operator || '').trim();
+  const concept = (m.concept || '').trim();
+
+  if (m.type === 'ENTRADA') {
+    const line1 = `ENTRADA S/${montoStr}${op ? ' ' + op : ''}`;
+    const formattedConcept = concept ? (concept.startsWith('*') ? concept : `*${concept}*`) : '';
+    return formattedConcept ? `${line1}\n${formattedConcept}` : line1;
+  } else {
+    const isService = /^(?:servicio\s*\d*|\d+(?:er|do|ro|to|to|vo|no)?\s*servicio|primer\s*servicio|segundo\s*servicio|tercer\s*servicio|cuarto\s*servicio|n[uú]mero\s*servicio|\d+)$/i.test(concept);
+    const isSueldo = /^sueldo\b/i.test(concept);
+
+    if (op && isService) {
+      return `SALIDA S/${montoStr} ${op}\n${concept}`;
+    } else if (op && isSueldo) {
+      const detail = concept.toLowerCase().includes(op.toLowerCase()) ? concept : `${concept} ${op}`;
+      return `SALIDA S/${montoStr}\n${detail}`;
+    } else if (op) {
+      return `SALIDA S/${montoStr} ${op}\n${concept}`;
+    } else {
+      return concept ? `SALIDA S/${montoStr}\n${concept}` : `SALIDA S/${montoStr}`;
+    }
+  }
+}
+
+function buildCashReportText(date, movements) {
+  if (!movements || !movements.length) {
+    return `*REPORTE DE CAJA - ${date}*\n*SPLASH SEDE LAS FLORES*\n\nNo hay movimientos registrados para esta fecha.`;
+  }
+  const header = `*REPORTE DE CAJA - ${date}*\n*SPLASH SEDE LAS FLORES*`;
+  const body = movements.map(formatCashMovement).join('\n\n');
+
+  let totalEntradas = 0;
+  let totalSalidas = 0;
+  movements.forEach((m) => {
+    if (m.type === 'ENTRADA') totalEntradas += Number(m.amount) || 0;
+    else totalSalidas += Number(m.amount) || 0;
+  });
+  const saldo = totalEntradas - totalSalidas;
+  const footer = `----------------------------------------\n*TOTAL ENTRADAS:* S/ ${totalEntradas.toFixed(2)}\n*TOTAL SALIDAS:*  S/ ${totalSalidas.toFixed(2)}\n*SALDO EN CAJA:*  S/ ${saldo.toFixed(2)}`;
+  return `${header}\n\n${body}\n\n${footer}`;
+}
+
+function renderCashConceptPills(type) {
+  if (!cashConceptPills) return;
+  const pills = type === 'ENTRADA'
+    ? ['*primer servicio*', '*segundo servicio*', '*tercer servicio*', '*cuarto servicio*', '*lavado completo*', '*servicio extra*']
+    : ['servicio 1', 'servicio 2', 'servicio 3', 'Sueldo', 'Adelanto', 'Insumos', 'Taxi', 'Almuerzo'];
+
+  cashConceptPills.innerHTML = pills.map((p) => `<button type="button" class="cash-pill" data-cash-pill="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('');
+}
+
+function renderCashQuickOperators() {
+  if (!cashQuickOperators) return;
+  if (!arrivals || !arrivals.length) {
+    cashQuickOperators.innerHTML = '<small style="color:var(--muted);font-size:0.75rem">Sin llegadas registradas hoy</small>';
+    return;
+  }
+  cashQuickOperators.innerHTML = arrivals.map((arr, idx) => {
+    const label = `${idx + 1}. ${arr.name}`;
+    return `<button type="button" class="cash-chip" data-cash-op="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+  }).join('');
+}
+
+// Iniciar cámara en vivo
+async function startCashLiveCamera() {
+  stopCashLiveCamera();
+  if (window.SplashAdminNative?.requestCameraPermission) {
+    try { window.SplashAdminNative.requestCameraPermission(); } catch (_) {}
+  }
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("No hay soporte de mediaDevices");
+    }
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+        audio: false
+      });
+    } catch (e1) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    }
+    cashCameraStream = stream;
+    if (cashCameraVideo) {
+      cashCameraVideo.srcObject = cashCameraStream;
+      await cashCameraVideo.play();
+    }
+    if (cashCameraLiveWrap) cashCameraLiveWrap.hidden = false;
+    if (cashCameraButtons) cashCameraButtons.hidden = true;
+  } catch (err) {
+    console.error("No se pudo iniciar la cámara en la app:", err);
+    showToast("No se pudo abrir la cámara. Activa el permiso de cámara en la app.");
+  }
+}
+
+function captureCashLiveFrame() {
+  if (!cashCameraVideo || !cashCameraStream) return;
+  const canvas = document.createElement("canvas");
+  const maxW = 960;
+  let w = cashCameraVideo.videoWidth || 800;
+  let h = cashCameraVideo.videoHeight || 600;
+  if (w > maxW) {
+    h = Math.round((h * maxW) / w);
+    w = maxW;
+  }
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.drawImage(cashCameraVideo, 0, 0, w, h);
+    currentCashPhotoData = canvas.toDataURL("image/jpeg", 0.85);
+    if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = currentCashPhotoData;
+    if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = false;
+    showToast("Foto del billete capturada.");
+  }
+  stopCashLiveCamera();
+}
+
+function stopCashLiveCamera() {
+  if (cashCameraStream) {
+    cashCameraStream.getTracks().forEach((track) => track.stop());
+    cashCameraStream = null;
+  }
+  if (cashCameraVideo) {
+    cashCameraVideo.srcObject = null;
+  }
+  if (cashCameraLiveWrap) cashCameraLiveWrap.hidden = true;
+  if (cashCameraButtons) cashCameraButtons.hidden = false;
+}
+
+function stampPhotoWithText(imgElement, line1, line2, subtext) {
+  try {
+    const canvas = document.createElement('canvas');
+    const maxW = 960;
+    let w = imgElement.naturalWidth || imgElement.width || 800;
+    let h = imgElement.naturalHeight || imgElement.height || 600;
+    if (w > maxW) {
+      h = Math.round((h * maxW) / w);
+      w = maxW;
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return imgElement.src;
+
+    ctx.drawImage(imgElement, 0, 0, w, h);
+
+    const bannerHeight = Math.max(80, Math.round(h * 0.22));
+    const grad = ctx.createLinearGradient(0, h - bannerHeight - 20, 0, h);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(0.3, 'rgba(0, 0, 0, 0.7)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, h - bannerHeight - 20, w, bannerHeight + 20);
+
+    const isIncome = line1.startsWith('ENTRADA');
+    const baseFontSize = Math.max(16, Math.round(w * 0.04));
+    ctx.font = `bold ${baseFontSize}px sans-serif`;
+    ctx.fillStyle = isIncome ? '#4ade80' : '#f87171';
+    const padLeft = Math.round(w * 0.04);
+    const bottomPad = Math.round(h * 0.04);
+
+    const yLine1 = h - bottomPad - Math.round(baseFontSize * 1.7);
+    const yLine2 = h - bottomPad - Math.round(baseFontSize * 0.6);
+    const ySub = h - bottomPad + Math.round(baseFontSize * 0.4);
+
+    ctx.fillText(line1, padLeft, yLine1);
+
+    if (line2) {
+      ctx.font = `600 ${Math.round(baseFontSize * 0.85)}px sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(line2, padLeft, yLine2);
+    }
+
+    if (subtext) {
+      ctx.font = `500 ${Math.round(baseFontSize * 0.65)}px sans-serif`;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(subtext, padLeft, ySub);
+    }
+
+    return canvas.toDataURL('image/jpeg', 0.82);
+  } catch {
+    return imgElement.src;
+  }
+}
+
+async function shareCashMovementToWhatsApp(movement) {
+  const text = formatCashMovement(movement);
+
+  if (window.SplashAdminNative?.shareToWhatsApp) {
+    window.SplashAdminNative.shareToWhatsApp(movement.photo || "", text);
+    showToast("Abriendo WhatsApp con el reporte...");
+    return;
+  }
+
+  if (movement.photo) {
+    try {
+      const res = await fetch(movement.photo);
+      const blob = await res.blob();
+      const file = new File([blob], `billete_${movement.type.toLowerCase()}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          text: text,
+          title: `Reporte de ${movement.type}`
+        });
+        showToast("Reporte compartido en WhatsApp con foto.");
+        return;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.warn("No se pudo usar navigator.share con archivos:", err);
+    }
+  }
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  showToast("Abriendo WhatsApp con el reporte.");
+}
+
+function openPhotoViewer(movement) {
+  if (!movement || !movement.photo || !cashPhotoModal) return;
+  activeModalMovement = movement;
+  cashPhotoModalImg.src = movement.photo;
+  cashPhotoModalCaption.textContent = formatCashMovement(movement);
+  if (cashPhotoModalDownload) {
+    cashPhotoModalDownload.href = movement.photo;
+    cashPhotoModalDownload.download = `billete_${movement.type.toLowerCase()}_${movement.timestamp || Date.now()}.jpg`;
+  }
+  cashPhotoModal.showModal();
+}
+
+function resetPhotoInput() {
+  currentCashPhotoData = "";
+  stopCashLiveCamera();
+  if (cashPhotoInput) cashPhotoInput.value = "";
+  if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = "";
+  if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = true;
+}
+
+function renderCashDialog() {
+  if (!cashReportsDialog) return;
+  const date = activeCashDate || getDate();
+  if (cashReportDateLabel) cashReportDateLabel.textContent = date;
+
+  if (cashCalendar && date) {
+    const parts = date.split('/');
+    if (parts.length === 3) cashCalendar.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+
+  const movements = getMovementsForDate(date);
+  let totalEntradas = 0;
+  let totalSalidas = 0;
+  let countEntradas = 0;
+  let countSalidas = 0;
+
+  movements.forEach((m) => {
+    if (m.type === 'ENTRADA') {
+      totalEntradas += Number(m.amount) || 0;
+      countEntradas++;
+    } else {
+      totalSalidas += Number(m.amount) || 0;
+      countSalidas++;
+    }
+  });
+
+  const saldo = totalEntradas - totalSalidas;
+
+  if (cashTotalIncome) cashTotalIncome.textContent = formatMontoDisplay(totalEntradas);
+  if (cashTotalExpense) cashTotalExpense.textContent = formatMontoDisplay(totalSalidas);
+  if (cashCountIncome) cashCountIncome.textContent = `${countEntradas} entrada${countEntradas === 1 ? '' : 's'}`;
+  if (cashCountExpense) cashCountExpense.textContent = `${countSalidas} salida${countSalidas === 1 ? '' : 's'}`;
+  if (cashBalance) {
+    cashBalance.textContent = formatMontoDisplay(saldo);
+    cashBalance.style.color = saldo >= 0 ? 'var(--ink)' : 'var(--coral)';
+  }
+  if (cashBalanceStatus) {
+    cashBalanceStatus.textContent = saldo > 0 ? 'Superávit en caja' : saldo < 0 ? 'Déficit en caja' : 'Equilibrado';
+  }
+
+  if (cashMovementsCount) cashMovementsCount.textContent = movements.length;
+
+  const reportText = buildCashReportText(date, movements);
+  if (cashReportPreview) cashReportPreview.textContent = reportText;
+
+  if (cashMovementsList) {
+    if (!movements.length) {
+      cashMovementsList.innerHTML = '<p class="empty-state">No hay movimientos en esta fecha.</p>';
+    } else {
+      cashMovementsList.innerHTML = movements.map((m, idx) => {
+        const isIncome = m.type === 'ENTRADA';
+        const formatted = formatCashMovement(m);
+        const lines = formatted.split('\n');
+        const line1 = lines[0] || '';
+        const line2 = lines.slice(1).join(' ') || '';
+        const payBadge = m.payment_method ? `<span class="cash-movement-badge" style="background:#e0f2fe;color:#0284c7;font-weight:600">${escapeHtml(m.payment_method)}</span>` : '';
+        return `
+          <div class="cash-movement-item">
+            ${m.photo ? `<img class="cash-movement-thumb" src="${m.photo}" alt="Foto billete" data-cash-view-photo="${idx}" title="Ver foto del billete">` : ''}
+            <span class="cash-movement-badge ${isIncome ? 'income' : 'expense'}">${m.type}</span>
+            ${payBadge}
+            <div class="cash-movement-info">
+              <span class="cash-movement-line1">${escapeHtml(line1)}</span>
+              ${line2 ? `<span class="cash-movement-line2">${escapeHtml(line2)}</span>` : ''}
+            </div>
+            <div class="cash-movement-meta">
+              <span class="cash-movement-time">${escapeHtml(m.time || '')}</span>
+              <button type="button" class="cash-movement-share-btn" data-cash-share-idx="${idx}" aria-label="Enviar a WhatsApp con foto" title="Enviar a WhatsApp con foto">&#9742;</button>
+              <button type="button" class="cash-movement-del" data-cash-del="${idx}" aria-label="Eliminar movimiento" title="Eliminar">&times;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  renderCashQuickOperators();
+}
+
+async function openCashReports() {
+  closeNavigation();
+  activeCashDate = getDate();
+  if ("Notification" in window && Notification.permission === "default") {
+    try { Notification.requestPermission().catch(() => {}); } catch (_) {}
+  }
+  if (window.SplashAdminNative?.requestCameraPermission) {
+    try { window.SplashAdminNative.requestCameraPermission(); } catch (_) {}
+  }
+  const selectedType = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
+  renderCashConceptPills(selectedType);
+  renderCashDialog();
+  if (cashReportsDialog) cashReportsDialog.showModal();
+
+  try {
+    await fetchCashMovementsFromSupabase(activeCashDate);
+    renderCashDialog();
+  } catch (_) {}
+}
+
+async function processAndSaveMovement(andShareToWhatsapp = false) {
+  const type = (document.querySelector('input[name="cash-type"]:checked') || {}).value || 'ENTRADA';
+  const amount = parseFloat(cashAmountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    showToast("Ingresa un monto válido.");
+    cashAmountInput.focus();
+    return;
+  }
+  const concept = (cashConceptInput.value || '').trim();
+  if (!concept) {
+    showToast("Ingresa el detalle o concepto.");
+    cashConceptInput.focus();
+    return;
+  }
+  const operator = (cashOperatorInput.value || '').trim();
+  const date = activeCashDate || getDate();
+  const time = getTime();
+
+  const movement = {
+    id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    type,
+    amount,
+    operator,
+    concept,
+    service_number: '',
+    payment_method: 'Efectivo',
+    observation: '',
+    photo: currentCashPhotoData || '',
+    time,
+    timestamp: Date.now()
+  };
+
+  const movements = getMovementsForDate(date);
+  movements.push(movement);
+  saveMovementsForDate(date, movements);
+
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/cash_movements`, {
+      method: 'POST',
+      headers: supabaseHeaders({
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      }),
+      body: JSON.stringify({
+        id: movement.id,
+        date: date,
+        type: movement.type,
+        amount: movement.amount,
+        operator: movement.operator,
+        concept: movement.concept,
+        service_number: movement.service_number,
+        payment_method: movement.payment_method,
+        observation: movement.observation,
+        photo: movement.photo || '',
+        time: movement.time
+      })
+    }).catch(() => {});
+  } catch (_) {}
+
+  notifyCashRecord();
+
+  cashAmountInput.value = '';
+  cashConceptInput.value = '';
+  cashOperatorInput.value = '';
+  resetPhotoInput();
+  renderCashDialog();
+
+  if (andShareToWhatsapp) {
+    await shareCashMovementToWhatsApp(movement);
+  } else {
+    showToast("Movimiento registrado en caja.");
+  }
+}
+
+if (cashReportsButton) {
+  cashReportsButton.addEventListener('click', openCashReports);
+}
+if (cashReportsClose) {
+  cashReportsClose.addEventListener('click', () => {
+    stopCashLiveCamera();
+    cashReportsDialog.close();
+  });
+}
+if (cashReportsDialog) {
+  cashReportsDialog.addEventListener('click', (e) => {
+    if (e.target === cashReportsDialog) {
+      stopCashLiveCamera();
+      cashReportsDialog.close();
+    }
+  });
+}
+
+// Botones de monto rápido
+if (cashAmountPills) {
+  cashAmountPills.addEventListener('click', (e) => {
+    const pill = e.target.closest('[data-amount]');
+    if (!pill) return;
+    cashAmountInput.value = pill.dataset.amount;
+    cashAmountInput.focus();
+  });
+}
+
+// Cámara en vivo
+if (cashOpenCameraBtn) {
+  cashOpenCameraBtn.addEventListener('click', startCashLiveCamera);
+}
+if (cashCameraCaptureBtn) {
+  cashCameraCaptureBtn.addEventListener('click', captureCashLiveFrame);
+}
+if (cashCameraCloseBtn) {
+  cashCameraCloseBtn.addEventListener('click', stopCashLiveCamera);
+}
+
+document.querySelectorAll('input[name="cash-type"]').forEach((radio) => {
+  radio.addEventListener('change', (e) => {
+    renderCashConceptPills(e.target.value);
+  });
+});
+
+if (cashConceptPills) {
+  cashConceptPills.addEventListener('click', (e) => {
+    const pill = e.target.closest('[data-cash-pill]');
+    if (!pill) return;
+    cashConceptInput.value = pill.dataset.cashPill;
+    cashConceptInput.focus();
+  });
+}
+
+if (cashQuickOperators) {
+  cashQuickOperators.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-cash-op]');
+    if (!chip) return;
+    cashOperatorInput.value = chip.dataset.cashOp;
+    cashOperatorInput.focus();
+  });
+}
+
+if (cashOperatorInput && cashOperatorSuggestions) {
+  cashOperatorInput.addEventListener('input', () => {
+    const filter = cashOperatorInput.value.trim().toLocaleLowerCase();
+    if (!filter) {
+      cashOperatorSuggestions.hidden = true;
+      cashOperatorSuggestions.innerHTML = '';
+      return;
+    }
+    const matches = (registeredPeople || []).filter((p) => p.toLocaleLowerCase().includes(filter)).slice(0, 5);
+    if (!matches.length) {
+      cashOperatorSuggestions.hidden = true;
+      cashOperatorSuggestions.innerHTML = '';
+      return;
+    }
+    cashOperatorSuggestions.innerHTML = matches.map((name) => `<button type="button" role="option" data-cash-suggest="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
+    cashOperatorSuggestions.hidden = false;
+  });
+
+  cashOperatorSuggestions.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('[data-cash-suggest]');
+    if (!btn) return;
+    cashOperatorInput.value = btn.dataset.cashSuggest;
+    cashOperatorSuggestions.hidden = true;
+  });
+
+  cashOperatorInput.addEventListener('blur', () => {
+    window.setTimeout(() => { cashOperatorSuggestions.hidden = true; }, 150);
+  });
+}
+
+// Manejo de foto del billete desde archivo
+if (cashPhotoInput) {
+  cashPhotoInput.addEventListener('change', () => {
+    const file = cashPhotoInput.files && cashPhotoInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const rawData = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 960;
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > maxW) {
+          h = Math.round((h * maxW) / w);
+          w = maxW;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          currentCashPhotoData = canvas.toDataURL('image/jpeg', 0.82);
+        } else {
+          currentCashPhotoData = rawData;
+        }
+        if (cashPhotoPreviewImg) cashPhotoPreviewImg.src = currentCashPhotoData;
+        if (cashPhotoPreviewWrap) cashPhotoPreviewWrap.hidden = false;
+        showToast("Foto del billete cargada.");
+      };
+      img.src = rawData;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+if (cashPhotoRemove) {
+  cashPhotoRemove.addEventListener('click', resetPhotoInput);
+}
+
+if (cashMovementForm) {
+  cashMovementForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    processAndSaveMovement(false);
+  });
+}
+
+if (cashSubmitWhatsappBtn) {
+  cashSubmitWhatsappBtn.addEventListener('click', () => {
+    processAndSaveMovement(true);
+  });
+}
+
+if (cashMovementsList) {
+  cashMovementsList.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('[data-cash-del]');
+    if (delBtn) {
+      const idx = parseInt(delBtn.dataset.cashDel, 10);
+      const date = activeCashDate || getDate();
+      const movements = getMovementsForDate(date);
+      if (idx >= 0 && idx < movements.length) {
+        const removed = movements.splice(idx, 1)[0];
+        saveMovementsForDate(date, movements);
+        if (removed && removed.id) {
+          try {
+            fetch(`${SUPABASE_URL}/rest/v1/cash_movements?id=eq.${encodeURIComponent(removed.id)}`, {
+              method: 'DELETE',
+              headers: supabaseHeaders()
+            }).catch(() => {});
+          } catch (_) {}
+        }
+        renderCashDialog();
+        showToast("Movimiento eliminado.");
+      }
+      return;
+    }
+
+    const shareBtn = e.target.closest('[data-cash-share-idx]');
+    if (shareBtn) {
+      const idx = parseInt(shareBtn.dataset.cashShareIdx, 10);
+      const date = activeCashDate || getDate();
+      const movements = getMovementsForDate(date);
+      if (idx >= 0 && idx < movements.length) {
+        shareCashMovementToWhatsApp(movements[idx]);
+      }
+      return;
+    }
+
+    const thumb = e.target.closest('[data-cash-view-photo]');
+    if (thumb) {
+      const idx = parseInt(thumb.dataset.cashViewPhoto, 10);
+      const date = activeCashDate || getDate();
+      const movements = getMovementsForDate(date);
+      if (idx >= 0 && idx < movements.length) {
+        openPhotoViewer(movements[idx]);
+      }
+    }
+  });
+}
+
+if (cashPhotoModalClose) {
+  cashPhotoModalClose.addEventListener('click', () => cashPhotoModal.close());
+}
+if (cashPhotoModal) {
+  cashPhotoModal.addEventListener('click', (e) => {
+    if (e.target === cashPhotoModal) cashPhotoModal.close();
+  });
+}
+if (cashPhotoModalShare) {
+  cashPhotoModalShare.addEventListener('click', () => {
+    if (activeModalMovement) shareCashMovementToWhatsApp(activeModalMovement);
+  });
+}
+
+if (cashCopyButton) {
+  cashCopyButton.addEventListener('click', async () => {
+    const date = activeCashDate || getDate();
+    const movements = getMovementsForDate(date);
+    const text = buildCashReportText(date, movements);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      showToast("Reporte de caja copiado.");
+    } catch {
+      showToast("No se pudo copiar el texto.");
+    }
+  });
+}
+
+if (cashWhatsappButton) {
+  cashWhatsappButton.addEventListener('click', () => {
+    const date = activeCashDate || getDate();
+    const movements = getMovementsForDate(date);
+    const text = buildCashReportText(date, movements);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  });
+}
+
+if (cashCalendar) {
+  cashCalendar.addEventListener('change', async () => {
+    const val = cashCalendar.value;
+    if (!val) return;
+    const parts = val.split('-');
+    if (parts.length === 3) {
+      activeCashDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      renderCashDialog();
+      try {
+        await fetchCashMovementsFromSupabase(activeCashDate);
+        renderCashDialog();
+      } catch (_) {}
+    }
+  });
+}
+
+// =============================================================
+// GESTOR DE VERSIONES DE APK (SUPABASE)
+// =============================================================
+const apkManagerButton = document.querySelector("#apk-manager-button");
+const apkManagerDialog = document.querySelector("#apk-manager-dialog");
+const apkManagerClose = document.querySelector("#apk-manager-close");
+const apkVersionForm = document.querySelector("#apk-version-form");
+const apkAppName = document.querySelector("#apk-app-name");
+const apkVersionName = document.querySelector("#apk-version-name");
+const apkVersionCode = document.querySelector("#apk-version-code");
+const apkUrlInput = document.querySelector("#apk-url-input");
+const apkChangelog = document.querySelector("#apk-changelog");
+const apkPublishBtn = document.querySelector("#apk-publish-btn");
+const apkFormMessage = document.querySelector("#apk-form-message");
+const apkRefreshBtn = document.querySelector("#apk-refresh-btn");
+const apkVersionsList = document.querySelector("#apk-versions-list");
+
+async function fetchApkVersions() {
+  if (!apkVersionsList) return;
+  apkVersionsList.innerHTML = '<p style="color:var(--muted);font-size:0.9rem">Cargando versiones desde Supabase...</p>';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_versions?order=version_code.desc`, {
+      headers: supabaseHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const list = await res.json();
+    if (!list || !list.length) {
+      apkVersionsList.innerHTML = '<p class="empty-state">No hay versiones registradas aún en Supabase.</p>';
+      return;
+    }
+    apkVersionsList.innerHTML = list.map((v) => {
+      const isOperario = v.app_name === 'operarios';
+      const badgeStyle = isOperario
+        ? 'background:rgba(0,140,149,0.15);color:#008c95;'
+        : 'background:rgba(235,94,85,0.15);color:#eb5e55;';
+      const appTitle = isOperario ? 'Operarios (SPLASH)' : 'Admin (SPLASH Admin)';
+      const dateStr = v.created_at ? new Date(v.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      return `
+        <div class="apk-version-card" style="background:#fff;border:1px solid #dce9ec;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-size:0.75rem;font-weight:700;padding:2px 8px;border-radius:6px;${badgeStyle}">${appTitle}</span>
+              <strong style="margin-left:8px;font-size:0.95rem;color:#102f49">v${escapeHtml(v.version_name)} (código ${v.version_code})</strong>
+            </div>
+            <small style="color:#64748b;font-size:0.75rem">${dateStr}</small>
+          </div>
+          ${v.changelog ? `<p style="margin:0;font-size:0.85rem;color:#334155">${escapeHtml(v.changelog)}</p>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+            <a href="${escapeHtml(v.apk_url)}" target="_blank" rel="noopener noreferrer" style="font-size:0.8rem;color:#008c95;text-decoration:none;word-break:break-all;max-width:80%">🔗 ${escapeHtml(v.apk_url)}</a>
+            <button type="button" class="secondary-action" data-apk-del-id="${v.id}" style="padding:4px 8px;font-size:0.75rem;color:#ef4444;border-color:#fca5a5" title="Eliminar versión">&times; Borrar</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error cargando versiones:', err);
+    apkVersionsList.innerHTML = `<p style="color:#ef4444;font-size:0.85rem">Error al conectar con Supabase: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function handleApkFormSubmit(e) {
+  e.preventDefault();
+  if (!apkAppName || !apkVersionName || !apkVersionCode || !apkUrlInput) return;
+  const app_name = apkAppName.value;
+  const version_name = apkVersionName.value.trim();
+  const version_code = parseInt(apkVersionCode.value, 10);
+  const apk_url = apkUrlInput.value.trim();
+  const changelog = (apkChangelog?.value || '').trim();
+
+  if (!version_name || isNaN(version_code) || !apk_url) {
+    if (apkFormMessage) {
+      apkFormMessage.textContent = 'Por favor completa todos los campos requeridos.';
+      apkFormMessage.style.color = '#ef4444';
+    }
+    return;
+  }
+
+  if (apkPublishBtn) {
+    apkPublishBtn.disabled = true;
+    apkPublishBtn.textContent = 'Publicando...';
+  }
+
+  try {
+    const payload = {
+      app_name,
+      version_name,
+      version_code,
+      apk_url,
+      changelog,
+      is_active: true,
+      is_mandatory: false,
+      created_at: new Date().toISOString()
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_versions`, {
+      method: 'POST',
+      headers: supabaseHeaders({
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      }),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errBody}`);
+    }
+
+    if (apkFormMessage) {
+      apkFormMessage.textContent = '¡Versión publicada con éxito en Supabase!';
+      apkFormMessage.style.color = '#008c95';
+    }
+    showToast(`APK ${version_name} publicado en Supabase.`);
+    apkVersionForm.reset();
+    await fetchApkVersions();
+  } catch (err) {
+    console.error('Error al publicar APK en Supabase:', err);
+    if (apkFormMessage) {
+      apkFormMessage.textContent = `Error al publicar: ${err.message}`;
+      apkFormMessage.style.color = '#ef4444';
+    }
+    showToast('Error al publicar versión en Supabase.');
+  } finally {
+    if (apkPublishBtn) {
+      apkPublishBtn.disabled = false;
+      apkPublishBtn.textContent = '🚀 Publicar en Supabase';
+    }
+  }
+}
+
+if (apkManagerButton) {
+  apkManagerButton.addEventListener('click', () => {
+    closeNavigation();
+    if (apkManagerDialog) {
+      apkManagerDialog.showModal();
+      fetchApkVersions();
+    }
+  });
+}
+
+if (apkManagerClose) {
+  apkManagerClose.addEventListener('click', () => {
+    if (apkManagerDialog) apkManagerDialog.close();
+  });
+}
+
+if (apkManagerDialog) {
+  apkManagerDialog.addEventListener('click', (e) => {
+    if (e.target === apkManagerDialog) apkManagerDialog.close();
+  });
+}
+
+if (apkRefreshBtn) {
+  apkRefreshBtn.addEventListener('click', fetchApkVersions);
+}
+
+if (apkVersionForm) {
+  apkVersionForm.addEventListener('submit', handleApkFormSubmit);
+}
+
+if (apkVersionsList) {
+  apkVersionsList.addEventListener('click', async (e) => {
+    const delBtn = e.target.closest('[data-apk-del-id]');
+    if (!delBtn) return;
+    const id = delBtn.dataset.apkDelId;
+    if (!id) return;
+    if (typeof confirm === 'function' && !confirm('¿Seguro que deseas eliminar el registro de esta versión?')) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_versions?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders()
+      });
+      showToast('Versión eliminada.');
+      fetchApkVersions();
+    } catch (err) {
+      showToast('Error al eliminar versión.');
+    }
+  });
+}
+
+// =============================================================
+// AVISO Y DESCARGA DE APK PARA ADMINISTRADORES
+// =============================================================
+const adminUpdateBanner = document.querySelector("#admin-update-banner");
+const adminUpdateBannerTitle = document.querySelector("#admin-update-banner-title");
+const adminUpdateBannerDesc = document.querySelector("#admin-update-banner-desc");
+const adminUpdateBannerBtn = document.querySelector("#admin-update-banner-btn");
+const adminUpdateBannerManage = document.querySelector("#admin-update-banner-manage");
+const adminLoginDownloadApk = document.querySelector("#admin-login-download-apk");
+
+const DEFAULT_ADMIN_APK_URL = 'https://raw.githubusercontent.com/Pauluwu18/sphash-sede-las-flores-app/main/SPLASH-Admin.apk';
+let cachedAdminApkUrl = DEFAULT_ADMIN_APK_URL;
+
+function triggerDownloadAdminApk(url) {
+  const target = url || cachedAdminApkUrl || DEFAULT_ADMIN_APK_URL;
+  try {
+    window.open(target, '_blank');
+  } catch (_) {}
+  try {
+    const a = document.createElement('a');
+    a.href = target;
+    a.download = 'SPLASH-Admin.apk';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (_) {}
+  setTimeout(() => {
+    try { window.location.href = target; } catch (_) {}
+  }, 100);
+}
+
+async function checkAdminAppVersionQuietly() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_versions?order=created_at.desc&limit=5`, {
+      headers: supabaseHeaders()
+    });
+    if (!res.ok) return;
+    const list = await res.json();
+    if (!list || !list.length) return;
+
+    const adminVer = list.find((v) => v.app_name === 'admin');
+    const operarioVer = list.find((v) => v.app_name === 'operarios');
+
+    if (adminVer && adminVer.apk_url) cachedAdminApkUrl = adminVer.apk_url;
+
+    if (adminUpdateBanner) {
+      adminUpdateBanner.hidden = false;
+      if (adminUpdateBannerTitle) {
+        adminUpdateBannerTitle.textContent = adminVer
+          ? `🔔 ¡Nueva versión disponible: SPLASH Admin v${adminVer.version_name}!`
+          : `🔔 ¡Nueva versión de APK registrada en Supabase!`;
+      }
+      if (adminUpdateBannerDesc) {
+        adminUpdateBannerDesc.textContent = (adminVer && adminVer.changelog) || (operarioVer && operarioVer.changelog) || 'Hay una nueva actualización disponible para la app.';
+      }
+    }
+  } catch (_) {}
+}
+
+if (adminUpdateBannerBtn) {
+  adminUpdateBannerBtn.addEventListener('click', () => triggerDownloadAdminApk(cachedAdminApkUrl));
+}
+if (adminUpdateBannerManage) {
+  adminUpdateBannerManage.addEventListener('click', () => {
+    if (apkManagerDialog) {
+      apkManagerDialog.showModal();
+      fetchApkVersions();
+    }
+  });
+}
+if (adminLoginDownloadApk) {
+  adminLoginDownloadApk.addEventListener('click', () => triggerDownloadAdminApk(DEFAULT_ADMIN_APK_URL));
+}
+
+checkAdminAppVersionQuietly();

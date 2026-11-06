@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=menu-3">
-  <link rel="stylesheet" href="qr-attendance.css?v=menu-3">
+  <link rel="stylesheet" href="styles.css?v=1792074313762">
+  <link rel="stylesheet" href="qr-attendance.css?v=session-1">
 </head>
 <body>
   <div class="login-screen" id="login-screen">
@@ -33,10 +33,57 @@
           <button class="password-toggle" id="password-toggle" type="button" aria-label="Mostrar contraseña" aria-controls="login-password" aria-pressed="false"><svg aria-hidden="true" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="eye-slash" d="m4 4 16 16"/></svg></button>
         </div>
       </div>
+      <label class="late-toggle keep-session-toggle" for="keep-session">
+        <input id="keep-session" type="checkbox" aria-describedby="keep-session-help">
+        <span class="toggle-ui" aria-hidden="true"></span>
+        <span>Mantener sesión iniciada</span>
+      </label>
+      <p id="keep-session-help" class="keep-session-help">Entrar automáticamente en este dispositivo durante 30 días.</p>
       <button class="login-button" type="submit">Iniciar sesión</button>
       <p class="login-message" id="login-message" role="alert" aria-live="polite"></p>
+      <div style="margin-top:14px;padding:12px;background:#eef6f8;border-radius:12px;text-align:center;border:1px solid #d0e7eb">
+        <small style="color:#008c95;font-weight:700;display:block">¿Usas la app en tu teléfono Android?</small>
+        <button type="button" class="secondary-action" id="admin-login-download-apk" style="margin-top:8px;width:100%;font-size:0.85rem;font-weight:600">
+          📥 Descargar APK de Administración
+        </button>
+      </div>
       <a class="portal-link" href="operarios.html">Soy operario ? Acceder con DNI</a>
     </form>
+    <div class="login-card" id="admin-android-blocked-screen" style="display:none; text-align:center; max-width:440px;" aria-labelledby="blocked-title">
+      <div class="login-mark" style="background:#fee2e2; color:#ef4444; width:64px; height:64px; margin:0 auto 16px; border-radius:50%; display:flex; align-items:center; justify-content:center;" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <p class="login-kicker" style="color:#ef4444; font-weight:700; margin:0 0 6px; letter-spacing:0.05em;">ACCESO RESTRINGIDO</p>
+      <h1 id="blocked-title" style="font-size:1.4rem; margin:0 0 12px; color:#102a43; font-weight:700;">Panel Administrativo Bloqueado en Móvil</h1>
+      <p class="login-subtitle" style="font-size:0.92rem; color:#486581; line-height:1.5; margin:0 0 18px;">
+        Por seguridad, el acceso administrativo está bloqueado en navegadores web de teléfonos Android.
+      </p>
+      <div style="background:#f0f4f8; border-radius:12px; padding:14px; text-align:left; margin-bottom:18px; border:1px solid #d9e2ec; font-size:0.88rem; color:#334e68; line-height:1.5;">
+        <p style="margin:0 0 8px; font-weight:700; color:#102a43;">¿Cómo acceder a la administración?</p>
+        <p style="margin:0 0 8px;">💻 <strong>Desde Computadora (PC / Laptop):</strong> Ingresa a este mismo enlace web desde cualquier PC.</p>
+        <p style="margin:0;">📱 <strong>En Android:</strong> Abre la aplicación instalada oficial <strong>SPLASH Admin</strong>.</p>
+      </div>
+      <a class="primary-button" href="operarios.html" style="display:block; text-align:center; padding:12px 18px; text-decoration:none; font-weight:700; border-radius:10px; background:#008c95; color:#fff; box-shadow:0 2px 8px rgba(0,140,149,0.3); font-size:0.95rem;">
+        Ir al Portal de Operarios
+      </a>
+    </div>
+    <script>
+      (function() {
+        try {
+          var isAndroid = /Android/i.test(navigator.userAgent);
+          var isNativeAdmin = typeof window.SplashAdminNative !== 'undefined';
+          if (isAndroid && !isNativeAdmin) {
+            var lf = document.getElementById('login-form');
+            var bs = document.getElementById('admin-android-blocked-screen');
+            if (lf) lf.style.setProperty('display', 'none', 'important');
+            if (bs) bs.style.setProperty('display', 'block', 'important');
+          }
+        } catch (_) {}
+      })();
+    </script>
   </div>
   <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="navigation-drawer" aria-label="Abrir menú de navegación">
     <span aria-hidden="true">&#9776;</span>
@@ -62,6 +109,12 @@
       <button class="navigation-action" id="base-movements" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg></span>
         <span><strong>Control de servicios de la base</strong><small>Consultar y finalizar servicios</small></span>
       </button>
+      <button class="navigation-action" id="cash-reports-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+        <span><strong>Reportes de caja</strong><small>Tomar foto de billete y reportar</small></span>
+      </button>
+      <button class="navigation-action" id="apk-manager-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+        <span><strong>Versiones y APK</strong><small>Publicar actualizaciones en Supabase</small></span>
+      </button>
       <button class="navigation-action" id="inventory-tab" type="button" aria-expanded="false" aria-controls="inventory-drawer"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 6a5 5 0 0 0-6 6l-5 5a3 3 0 0 0 4 4l5-5a5 5 0 0 0 6-6l-3 3-4-4z"/></svg></span>
         <span><strong>Herramientas</strong><small>Consultar préstamos y devoluciones</small></span>
       </button>
@@ -74,10 +127,28 @@
 
       <button class="navigation-action" id="admin-logout" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 4H4v16h5m5-12 4 4-4 4M8 12h10"/></svg></span><span><strong>Cerrar sesión</strong><small>Salir de administración</small></span></button>
     </nav>
+    <button class="secondary-action" id="admin-voice-settings" type="button" hidden>Configurar voz femenina</button>
     <p class="navigation-hint">Asistencias sincronizadas con Supabase.</p>
   </aside>
   <main class="shell">
     <div class="welcome-message" id="welcome-message" role="status" aria-live="polite">BIENVENIDO</div>
+    <div id="admin-update-banner" hidden style="background:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:12px 18px;border-radius:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:1.4rem">🔔</span>
+        <div>
+          <strong id="admin-update-banner-title">¡Nueva versión disponible de la App!</strong>
+          <p id="admin-update-banner-desc" style="margin:2px 0 0;font-size:0.85rem">Hay actualizaciones disponibles para descargar e instalar.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="admin-update-banner-btn" class="primary-button" style="padding:8px 16px;font-size:0.85rem;white-space:nowrap;background:#008c95;border-color:#00757d">
+          📥 Descargar APK
+        </button>
+        <button type="button" id="admin-update-banner-manage" class="secondary-action" style="padding:8px 14px;font-size:0.85rem;white-space:nowrap">
+          Gestionar versiones
+        </button>
+      </div>
+    </div>
     <header class="topbar">
       <div>
         <p class="eyebrow">SPLASH SEDE LAS FLORES</p>
@@ -149,10 +220,12 @@
             <button class="refresh-button" id="refresh-current-button" type="button" aria-label="Actualizar registro del servidor" title="Actualizar registro del servidor">&#8635;</button>
           </div>
         </div>
+        <p id="admin-push-status" role="status" hidden></p>
         <div class="report-wrap">
           <pre id="report" aria-label="Reporte de asistencia"></pre>
         </div>
         <div class="report-actions">
+          <button class="secondary-action" id="download-current-excel" type="button">Descargar Excel del día</button>
           <button class="save-button" id="save-button" type="button"><span aria-hidden="true">&#10003;</span> Guardar</button>
           <button class="copy-button" id="copy-button" type="button">
             <span class="copy-icon" aria-hidden="true"></span> Copiar texto
@@ -176,6 +249,201 @@
 
     <footer>El reporte muestra únicamente las personas registradas.</footer>
   </main>
+  <dialog class="cash-reports-dialog" id="cash-reports-dialog" aria-labelledby="cash-reports-title">
+    <div class="dialog-heading">
+      <div>
+        <p class="section-kicker">Caja y dinero</p>
+        <h2 id="cash-reports-title">Reportes de caja</h2>
+      </div>
+      <button class="dialog-close" id="cash-reports-close" type="button" aria-label="Cerrar reportes de caja">&times;</button>
+    </div>
+    <p class="movements-subtitle">Control de entradas y salidas de dinero de la caja.</p>
+
+    <div class="cash-date-row">
+      <div class="cash-date-info">
+        <span class="field-label" style="margin:0">Fecha de caja:</span>
+        <strong id="cash-report-date-label"></strong>
+      </div>
+      <input class="history-calendar" id="cash-calendar" type="date" aria-label="Seleccionar fecha para reporte de caja">
+    </div>
+
+    <div class="cash-summary-grid">
+      <div class="cash-card income">
+        <span class="cash-card-label">TOTAL ENTRADAS</span>
+        <strong class="cash-card-amount" id="cash-total-income">S/ 0.00</strong>
+        <small id="cash-count-income">0 entradas</small>
+      </div>
+      <div class="cash-card expense">
+        <span class="cash-card-label">TOTAL SALIDAS</span>
+        <strong class="cash-card-amount" id="cash-total-expense">S/ 0.00</strong>
+        <small id="cash-count-expense">0 salidas</small>
+      </div>
+      <div class="cash-card balance">
+        <span class="cash-card-label">SALDO EN CAJA</span>
+        <strong class="cash-card-amount" id="cash-balance">S/ 0.00</strong>
+        <small id="cash-balance-status">Equilibrado</small>
+      </div>
+    </div>
+
+    <div class="cash-section" style="margin-top:14px;padding-top:0;border-top:0">
+      <div class="cash-section-title">
+        <h3>1. Foto del billete (Tomar foto primero)</h3>
+      </div>
+      <div class="cash-photo-section cash-photo-primary">
+        <!-- Visor de cámara en vivo dentro de la app -->
+        <div class="cash-camera-live-wrap" id="cash-camera-live-wrap" hidden>
+          <video id="cash-camera-video" playsinline autoplay muted></video>
+          <div class="cash-camera-live-actions">
+            <button type="button" class="cash-camera-capture-btn" id="cash-camera-capture-btn">
+              <span class="cash-camera-shutter"></span>
+              <span>Capturar foto</span>
+            </button>
+            <button type="button" class="cash-camera-close-btn" id="cash-camera-close-btn">
+              Cancelar
+            </button>
+          </div>
+        </div>
+
+        <div class="cash-camera-buttons" id="cash-camera-buttons">
+          <button type="button" class="cash-photo-main-btn" id="cash-open-camera-btn">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span>📸 Abrir cámara del billete</span>
+          </button>
+
+          <input id="cash-photo-input" type="file" accept="image/*" class="visually-hidden">
+          <label for="cash-photo-input" class="secondary-action cash-file-btn" id="cash-file-btn" hidden style="display:none;">
+            📁 Usar cámara del sistema / Galería
+          </label>
+        </div>
+
+        <div class="cash-photo-preview-wrap" id="cash-photo-preview-wrap" hidden>
+          <div class="cash-photo-preview-card">
+            <img id="cash-photo-preview-img" alt="Foto del billete">
+            <button type="button" class="cash-photo-remove" id="cash-photo-remove" aria-label="Quitar foto">&times;</button>
+          </div>
+          <div class="cash-photo-preview-info">
+            <strong class="cash-photo-ok-label">&#10003; Foto del billete capturada</strong>
+            <input id="cash-stamp-checkbox" type="checkbox" style="display:none;" aria-hidden="true">
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div class="cash-section" style="margin-top:16px">
+      <div class="cash-section-title">
+        <h3>2. Datos del movimiento</h3>
+      </div>
+      <form id="cash-movement-form" autocomplete="off">
+        <div class="cash-type-options" role="radiogroup" aria-label="Tipo de movimiento">
+          <label class="cash-type-option income-option">
+            <input type="radio" name="cash-type" value="ENTRADA" checked>
+            <span>+ ENTRADA (Ingreso a caja)</span>
+          </label>
+          <label class="cash-type-option expense-option">
+            <input type="radio" name="cash-type" value="SALIDA">
+            <span>- SALIDA (Retiro de caja)</span>
+          </label>
+        </div>
+
+        <div class="cash-inputs-grid">
+          <div class="cash-field">
+            <label for="cash-amount">Monto (S/) <small style="font-weight:normal;color:var(--muted)">(Ej. 100, 120 o 130.30)</small></label>
+            <div class="cash-amount-wrap">
+              <span class="cash-currency-prefix">S/</span>
+              <input id="cash-amount" type="number" step="any" min="0.01" inputmode="decimal" placeholder="100, 120 o 130.30" required>
+            </div>
+            <div class="cash-amount-pills" id="cash-amount-pills">
+              <button type="button" class="cash-amount-pill" data-amount="20">S/20</button>
+              <button type="button" class="cash-amount-pill" data-amount="30">S/30</button>
+              <button type="button" class="cash-amount-pill" data-amount="50">S/50</button>
+              <button type="button" class="cash-amount-pill" data-amount="80">S/80</button>
+              <button type="button" class="cash-amount-pill" data-amount="100">S/100</button>
+              <button type="button" class="cash-amount-pill" data-amount="120">S/120</button>
+              <button type="button" class="cash-amount-pill" data-amount="150">S/150</button>
+              <button type="button" class="cash-amount-pill" data-amount="200">S/200</button>
+            </div>
+          </div>
+
+          <div class="cash-field">
+            <label for="cash-operator">Operario / Persona <small>(Opcional)</small></label>
+            <div class="cash-operator-wrap">
+              <input id="cash-operator" type="text" maxlength="40" placeholder="Ej. ADRIANO, 3. RAUL..." autocomplete="off">
+              <div class="person-name-suggestions" id="cash-operator-suggestions" role="listbox" hidden></div>
+            </div>
+            <div class="cash-quick-operators" id="cash-quick-operators" aria-label="Operarios de hoy"></div>
+          </div>
+        </div>
+
+        <div class="cash-field" style="margin-top:10px">
+          <label for="cash-concept">Detalle / Servicio / Concepto</label>
+          <input id="cash-concept" type="text" maxlength="100" placeholder="Ej. primer servicio, sueldo, insumos..." required>
+          <div class="cash-concept-pills" id="cash-concept-pills"></div>
+        </div>
+
+        <div class="cash-submit-row">
+          <button class="whatsapp-button cash-submit-whatsapp-btn" id="cash-submit-whatsapp-btn" type="button">
+            <span aria-hidden="true">&#9742;</span> Guardar y enviar a WhatsApp con foto
+          </button>
+          <button class="primary-button cash-submit-btn" id="cash-submit-btn" type="submit">
+            <span aria-hidden="true">+</span> Guardar solo en caja
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="cash-section">
+      <div class="cash-section-title">
+        <h3>Texto del reporte (WhatsApp)</h3>
+        <span class="updated-label">Formato automático</span>
+      </div>
+      <div class="report-wrap" style="min-height:140px">
+        <pre class="cash-report-preview" id="cash-report-preview" aria-label="Reporte de caja"></pre>
+      </div>
+      <div class="cash-actions-row">
+        <button class="copy-button" id="cash-copy-button" type="button">
+          <span class="copy-icon" aria-hidden="true"></span> Copiar reporte
+        </button>
+        <button class="whatsapp-button" id="cash-whatsapp-button" type="button">
+          <span aria-hidden="true">&#9742;</span> Compartir por WhatsApp
+        </button>
+      </div>
+    </div>
+
+    <div class="cash-section">
+      <div class="cash-section-title">
+        <h3>Movimientos registrados</h3>
+        <span class="count" id="cash-movements-count">0</span>
+      </div>
+      <div class="cash-movements-list" id="cash-movements-list">
+        <p class="empty-state">No hay movimientos en esta fecha.</p>
+      </div>
+    </div>
+  </dialog>
+  <dialog class="cash-photo-modal" id="cash-photo-modal" aria-labelledby="cash-photo-modal-title">
+    <div class="dialog-heading">
+      <div>
+        <p class="section-kicker">Comprobante de caja</p>
+        <h2 id="cash-photo-modal-title">Foto del billete / movimiento</h2>
+      </div>
+      <button class="dialog-close" id="cash-photo-modal-close" type="button" aria-label="Cerrar foto">&times;</button>
+    </div>
+    <div class="cash-photo-modal-body">
+      <img id="cash-photo-modal-img" class="cash-photo-modal-img" alt="Foto ampliada del billete">
+      <pre id="cash-photo-modal-caption" class="cash-photo-modal-caption"></pre>
+    </div>
+    <div class="cash-actions-row" style="margin-top:14px">
+      <button class="whatsapp-button" id="cash-photo-modal-share" type="button">
+        <span aria-hidden="true">&#9742;</span> Enviar a WhatsApp
+      </button>
+      <a class="secondary-action" id="cash-photo-modal-download" download="comprobante_caja.jpg" style="display:flex;align-items:center;justify-content:center;text-decoration:none">
+        Descargar imagen
+      </a>
+    </div>
+  </dialog>
   <aside class="inventory-drawer" id="inventory-drawer" aria-label="Inventario de herramientas" aria-hidden="true">
     <div class="inventory-heading">
       <div><p class="section-kicker">Control opcional</p><h2>Herramientas</h2><small class="development-label">En desarrollo</small></div>
@@ -206,6 +474,7 @@
     <button class="history-load-button" id="history-load-button" type="button"><span aria-hidden="true">&#8658;</span> Cargar en paso 2</button>
     <pre class="history-report" id="history-report"></pre>
     <div class="history-share-actions">
+      <button class="secondary-action" id="download-history-excel" type="button">Descargar Excel de esta fecha</button>
       <button class="whatsapp-button" id="share-history-button" type="button"><span aria-hidden="true">&#9742;</span> Compartir por WhatsApp</button>
       <button class="copy-button" id="copy-history-button" type="button"><span class="copy-icon" aria-hidden="true"></span> Copiar este registro</button>
     </div>
@@ -296,12 +565,15 @@
     <div class="dialog-heading"><h2 id="profile-title">Perfil del operario</h2><button class="dialog-close" id="profile-close" type="button" aria-label="Cerrar perfil">&times;</button></div>
     <form id="profile-form"><input id="profile-id" type="hidden">
       <label class="worker-label" for="profile-name">Nombre completo</label><input id="profile-name" maxlength="100" required>
-      <label class="worker-label" for="profile-dni">DNI</label><input id="profile-dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" required>
+      <label class="worker-label" for="profile-dni">DNI</label><input id="profile-dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" aria-describedby="profile-dni-help">
+      <p class="worker-help" id="profile-dni-help">Si aún no tiene DNI registrado, puedes guardar su perfil sin completarlo.</p>
       <p class="worker-help">Al cambiar el DNI se elimina el PIN anterior y se cierran las sesiones de esa cuenta.</p>
       <label class="worker-label" for="profile-type">Tipo de persona</label><select id="profile-type"><option>Operario</option><option>Capacitado</option></select>
       <label class="late-toggle"><input id="profile-active" type="checkbox" style="position:static;opacity:1;width:20px;height:20px">Cuenta activa</label>
       <p class="pin-display" id="profile-pin"></p><button class="secondary-action" id="profile-pin-show" type="button">Consultar PIN</button>
-      <button class="primary-button" id="profile-save" type="submit">Guardar perfil</button><p id="profile-message" role="status"></p>
+      <button class="primary-button" id="profile-save" type="submit">Guardar perfil</button>
+      <button class="people-reset-button" id="profile-delete" type="button" style="margin-top:10px">Eliminar persona</button>
+      <p id="profile-message" role="status"></p>
     </form>
   </dialog>
   <dialog class="qr-dialog" id="qr-dialog" aria-labelledby="qr-title">
@@ -309,9 +581,64 @@
     <div class="qr-poster"><h3>SPLASH SEDE LAS FLORES</h3><div id="base-qr"></div><h3>Registra tu asistencia</h3><p>Escanea e ingresa con tu DNI y PIN.</p></div>
     <p id="qr-message" role="status"></p><div class="qr-actions"><button class="secondary-action" id="qr-print" disabled>Imprimir</button><button class="secondary-action" id="qr-download" disabled>Descargar imagen</button><button class="secondary-action" id="qr-rotate">Reemplazar QR</button></div>
   </dialog>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=menu-3"></script>
+  <dialog class="cash-reports-dialog" id="apk-manager-dialog" aria-labelledby="apk-manager-title" style="max-width:680px">
+    <div class="dialog-heading">
+      <div>
+        <p class="section-kicker">Actualizaciones móviles</p>
+        <h2 id="apk-manager-title">Gestión de Versiones de la App (APK)</h2>
+      </div>
+      <button class="dialog-close" id="apk-manager-close" type="button" aria-label="Cerrar gestión de versiones">&times;</button>
+    </div>
+    <p class="movements-subtitle">Publica los datos de las nuevas versiones de APK a Supabase para que los operarios y administradores se actualicen desde su app.</p>
+
+    <form id="apk-version-form" style="background:#f7fafb;padding:18px;border-radius:14px;border:1px solid #dce9ec;margin-bottom:20px">
+      <h3 style="margin-top:0;margin-bottom:12px;font-size:1.1rem;color:#102f49">Publicar nueva versión de APK</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="field-label" for="apk-app-name">Aplicación</label>
+          <select id="apk-app-name" class="history-calendar" style="width:100%;height:44px">
+            <option value="operarios">Operarios (SPLASH SEDE LAS FLORES)</option>
+            <option value="admin">Administración (SPLASH Admin)</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" for="apk-version-name">Nombre de versión (ej. 1.1 o 1.5)</label>
+          <input type="text" id="apk-version-name" class="history-calendar" placeholder="1.1" required style="width:100%;height:44px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-top:10px">
+        <div>
+          <label class="field-label" for="apk-version-code">Código de versión (número)</label>
+          <input type="number" id="apk-version-code" class="history-calendar" placeholder="2" required style="width:100%;height:44px">
+        </div>
+        <div>
+          <label class="field-label" for="apk-url-input">Enlace de descarga directa del APK</label>
+          <input type="url" id="apk-url-input" class="history-calendar" placeholder="https://github.com/.../app.apk o enlace directo" required style="width:100%;height:44px">
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label class="field-label" for="apk-changelog">Novedades y mejoras de esta versión</label>
+        <textarea id="apk-changelog" class="history-calendar" style="width:100%;height:64px;padding:8px" placeholder="Ej: Reporte de servicios con fotos para WhatsApp y caja, selector de pago y actualizador."></textarea>
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end">
+        <button type="submit" class="save-button" id="apk-publish-btn" style="min-width:180px">
+          🚀 Publicar en Supabase
+        </button>
+      </div>
+      <p id="apk-form-message" role="status" style="margin-top:8px;font-size:0.85rem;color:#008c95"></p>
+    </form>
+
+    <div class="movements-header" style="margin-top:10px">
+      <h3>Versiones registradas en Supabase</h3>
+      <button type="button" class="secondary-action" id="apk-refresh-btn" style="padding:6px 12px;font-size:0.85rem">Actualizar lista</button>
+    </div>
+    <div id="apk-versions-list" style="margin-top:12px;display:grid;gap:10px;max-height:260px;overflow-y:auto"></div>
+  </dialog>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=20261004-admin"></script>
   <script src="vendor/qrcode.min.js"></script>
-  <script src="app.js?v=menu-3"></script>
-  <script src="admin-qr.js?v=menu-3"></script>
+  <script src="vendor/exceljs.min.js"></script>
+  <script src="attendance-excel.js?v=20261003"></script>
+  <script src="app.js?v=1.1-tutor"></script>
+  <script src="admin-qr.js?v=20261004-profile"></script>
 </body>
 </html>
