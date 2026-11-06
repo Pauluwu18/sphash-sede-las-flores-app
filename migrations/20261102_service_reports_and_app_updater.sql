@@ -80,3 +80,4 @@ values (
   'https://github.com/Pauluwu18/sphash-sede-las-flores-app/releases/download/v1.1/SPLASH-Sede-Las-Flores-v1.1.apk',
   'Reporte rápido de servicios a caja y WhatsApp, selector de método de pago y actualización integrada.'
 ) on conflict do nothing;
+

@@ -14,20 +14,19 @@ import com.google.firebase.messaging.RemoteMessage
 class AdminMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         if (!getSharedPreferences("push", MODE_PRIVATE).getBoolean("notifications_enabled", true)) return
-        // Support both the original notification payload and 1.2's data + voice payload.
         val notification = message.notification
         val voice = message.data["kind"] == "attendance_voice"
         if (notification == null && !voice) return
+        val eventId = message.data["event_id"] ?: message.messageId ?: return
+        if (voice) {
+            val preferences = getSharedPreferences("spoken_events", MODE_PRIVATE)
+            val seen = preferences.getString("ids", "")!!.split("\n").filter { it.isNotEmpty() }
+            if (eventId in seen) return
+            preferences.edit().putString("ids", (seen.takeLast(127) + eventId).joinToString("\n")).apply()
+        }
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
-        val eventId = message.data["event_id"] ?: message.messageId
-        if (eventId != null) {
-            val preferences = getSharedPreferences("spoken_events", MODE_PRIVATE)
-            val previous = preferences.getString("ids", "")!!.split('\n').filter { it.isNotEmpty() }
-            if (eventId in previous) return
-            preferences.edit().putString("ids", (previous + eventId).takeLast(64).joinToString("\n")).apply()
-        }
         val openApp = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -35,6 +34,9 @@ class AdminMessagingService : FirebaseMessagingService() {
         )
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, "attendance")
                       else Notification.Builder(this)
+        // Android 8+ uses the user's channel settings. Older versions need
+        // an explicit sound on each notification, including foreground alerts.
+        if (Build.VERSION.SDK_INT < 26) builder.setDefaults(Notification.DEFAULT_SOUND)
         val alert = builder
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(0xFF008C95.toInt())
@@ -45,17 +47,24 @@ class AdminMessagingService : FirebaseMessagingService() {
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .build()
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(message.messageId?.hashCode() ?: System.currentTimeMillis().toInt(), alert)
-        val name = message.data["name"]?.take(100)
+            .notify(eventId.hashCode(), alert)
+        val name = message.data["name"]?.trim()?.take(160)
         val time = message.data["time"]
         if (voice && !name.isNullOrBlank() && time != null &&
-            time.matches(Regex("^([01][0-9]|2[0-3]):[0-5][0-9]$")) && AttendanceVoiceService.canSpeak(this)) {
-            val (hour, minute) = time.split(':').map { it.toInt() }
-            val intent = Intent(this, AttendanceVoiceService::class.java)
-                .putExtra("speech", "$name se registró a las $hour horas y $minute minutos.")
+            Regex("^([01][0-9]|2[0-3]):[0-5][0-9]$").matches(time) &&
+            (message.sentTime == 0L || System.currentTimeMillis() - message.sentTime < 60_000) &&
+            AttendanceVoiceService.canSpeak(this)
+        ) {
+            val parts = time.split(":").map { it.toInt() }
+            val text = "$name se registró a las ${parts[0]} horas y ${parts[1]} minutos."
+            val intent = Intent(this, AttendanceVoiceService::class.java).putExtra("speech", text)
             try {
-                if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
-            } catch (_: Exception) { /* Notification remains available if Android blocks voice playback. */ }
+                if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent)
+                else startService(intent)
+            } catch (_: RuntimeException) {
+                // Android may downgrade FCM priority and deny background audio.
+                // The visible attendance notification has already been delivered.
+            }
         }
     }
 

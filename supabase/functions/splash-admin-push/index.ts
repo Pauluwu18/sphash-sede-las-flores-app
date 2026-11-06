@@ -67,26 +67,27 @@ Deno.serve(async (request) => {
 
     const bearer = await accessToken(JSON.parse(accountJson));
     const results = await Promise.all(event.tokens.map(async (token: string) => {
+      const voice = Array.isArray(event.voice_tokens) && event.voice_tokens.includes(token);
+      const message = voice ? {
+        token,
+        data: {
+          kind: "attendance_voice", name: String(event.name || "Un operario"),
+          time: String(event.time), event_id: String(event.event_id),
+        },
+        android: { priority: "high", ttl: "60s" },
+      } : {
+        token,
+        notification: {
+          title: "Nueva asistencia QR",
+          body: `Se registró una asistencia a las ${event.time}. Abre administración para verla.`,
+        },
+        android: { priority: "high", notification: { channel_id: "attendance", default_sound: true } },
+      };
       const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(firebaseProject)}/messages:send`, {
         method: "POST",
         headers: { ...jsonHeaders, Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ message: {
-          token,
-          data: {
-            kind: "attendance_voice",
-            event_id: event.event_id || `${payload.person_id}:${payload.work_date}`,
-            name: event.name || "Un operario",
-            time: event.time,
-          },
-          android: { priority: "high", ttl: "300s" },
-        } }),
+        body: JSON.stringify({ message }),
       });
-      if (!response.ok) {
-        const failure = await response.json().catch(() => ({}));
-        // Log only status codes, never device tokens or service-account material.
-        const code = failure?.error?.details?.find((item: { errorCode?: string }) => item.errorCode)?.errorCode;
-        console.error('FCM delivery failed', response.status, code || failure?.error?.status || 'UNKNOWN');
-      }
       return response.ok;
     }));
     if (results.every((sent) => !sent)) throw new Error("All FCM deliveries failed");

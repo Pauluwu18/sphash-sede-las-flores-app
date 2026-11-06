@@ -1,4 +1,4 @@
--- After 20260916_admin_push.sql. Device subscriptions last 30 days since the
+-- After 20260928_admin_voice.sql. Device subscriptions last 30 days since the
 -- last authenticated registration; web sessions still expire after 12 hours.
 begin;
 alter table splash_private.admin_push_devices
@@ -41,17 +41,18 @@ end $$;
 
 create or replace function public.splash_push_event(p_person_id uuid,p_work_date date)
 returns jsonb language plpgsql security definer set search_path='' as $$
-declare checkin splash_private.checkins%rowtype; targets jsonb;
+declare checkin splash_private.checkins%rowtype; targets jsonb; voices jsonb;
 begin
   select * into checkin from splash_private.checkins
     where person_id=p_person_id and work_date=p_work_date and source='QR';
   if checkin.person_id is null then return jsonb_build_object('error','Registro QR no encontrado.'); end if;
-  select coalesce(jsonb_agg(fcm_token),'[]'::jsonb) into targets
+  select coalesce(jsonb_agg(fcm_token),'[]'::jsonb),
+    coalesce(jsonb_agg(fcm_token) filter (where voice_enabled),'[]'::jsonb) into targets,voices
     from splash_private.admin_push_devices where expires_at>now();
   return jsonb_build_object('date',checkin.work_date,
     'time',to_char(checkin.checked_at at time zone 'America/Lima','HH24:MI'),
     'name',(select name from splash_private.people where id=p_person_id),
-    'event_id',p_person_id::text || ':' || p_work_date::text,'tokens',targets);
+    'event_id',p_person_id::text || ':' || p_work_date::text,'tokens',targets,'voice_tokens',voices);
 end $$;
 
 -- Explicit logout revokes the subscription, but routine expired-session cleanup

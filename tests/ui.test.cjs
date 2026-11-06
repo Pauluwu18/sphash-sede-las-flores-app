@@ -5,6 +5,46 @@ const vm = require('node:vm');
 const {JSDOM, VirtualConsole} = require('jsdom');
 const flush = async () => { for(let i=0;i<15;i++) await new Promise(resolve => setImmediate(resolve)); };
 
+test('Perfil sin DNI guarda al desmarcar activo; DNI existente sigue siendo obligatorio',async t=>{
+ const calls=[];const people=[{id:'p1',name:'Antony',dni:null,active:true,type:'Operario'},{id:'p2',name:'Otra persona',dni:'12345678',active:true,type:'Operario'}];
+ const dom=page('admin.html',request=>{calls.push(request);if(request.action==='people')return people;if(request.action==='records')return request.payload.date?null:[];return {ok:true};});
+ t.after(()=>dom.window.close());const w=dom.window,$=id=>w.document.getElementById(id);
+ w.sessionStorage.setItem('splash-admin-session','admin');
+ vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+ vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());await flush();
+ w.AdminQR.profile('p1');$('profile-active').checked=false;
+ assert.equal($('profile-form').checkValidity(),true);
+ $('profile-save').click();await flush();
+ const saved=calls.find(c=>c.action==='save_person');assert.equal(saved.payload.active,false);assert.equal(saved.payload.dni,'');
+ assert.equal($('profile-dialog').open,false);
+ w.AdminQR.profile('p2');$('profile-dni').value='';
+ assert.equal($('profile-form').checkValidity(),false);
+});
+
+test('Eliminar desde personas pide confirmación, actualiza lista y no oculta errores',async t=>{
+  const calls=[];let exists=true,fail=false;
+  const dom=page('admin.html',request=>{
+    calls.push(request.action);
+    if(request.action==='people')return exists?[{id:'p1',name:'Persona de prueba',active:true,type:'Operario'}]:[];
+    if(request.action==='records')return request.payload.date?null:[];
+    if(request.action==='delete_person') {if(fail)return {error:'No se pudo eliminar'};exists=false;}
+    return {ok:true};
+  });
+  t.after(()=>dom.window.close());const w=dom.window;
+  w.sessionStorage.setItem('splash-admin-session','admin-session');
+  vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());await flush();
+  w.confirm=()=>false;
+  w.document.querySelector('[data-delete-person]').click();await flush();
+  assert.ok(!calls.includes('delete_person'));
+  w.confirm=message=>{assert.match(message,/Persona de prueba/);assert.match(message,/conservarán/);return true;};
+  fail=true;w.document.querySelector('[data-delete-person]').click();await flush();
+  assert.ok(w.document.querySelector('[data-delete-person]'));
+  assert.ok(!calls.includes('deactivate_person'));
+  fail=false;w.document.querySelector('[data-delete-person]').click();await flush();
+  assert.equal(w.document.querySelector('[data-delete-person]'),null);
+});
+
 function page(file, handler) {
   const dom = new JSDOM(fs.readFileSync(file,'utf8'), {url:`https://example.com/${file}`,runScripts:'outside-only',virtualConsole:new VirtualConsole()});
   const w=dom.window;
@@ -38,9 +78,9 @@ test('Administrador guarda la sesión solo al marcar la casilla y nunca guarda l
     const w=dom.window,$=id=>w.document.getElementById(id);
     vm.runInContext(fs.readFileSync('app.js','utf8'),dom.getInternalVMContext());
     vm.runInContext(fs.readFileSync('admin-qr.js','utf8'),dom.getInternalVMContext());
-    assert.equal($('login-remember').checked,false);
+    assert.equal($('keep-session').checked,false);
     $('login-user').value='admin';$('login-password').value='private-test-password';
-    $('login-remember').checked=remember;
+    $('keep-session').checked=remember;
     $('login-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();
     assert.equal(calls.find(c=>c.action==='admin_login').payload.remember_session,remember);
     assert.equal(w.localStorage.getItem('splash-admin-session'),remember ? 'new-session':null);
