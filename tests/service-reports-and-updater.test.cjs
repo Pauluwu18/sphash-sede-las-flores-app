@@ -80,9 +80,9 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   MockNotification.permission = 'granted';
 
   const dom = page('operarios.html', async (url, options) => {
-    if (url.includes('/rest/v1/cash_movements')) {
-      supabaseCalls.push({ url, options, body: options.body ? JSON.parse(options.body) : null });
-      return [{ id: 'saved-id' }];
+    if (url.includes('/rest/v1/rpc/splash_report_service')) {
+      supabaseCalls.push({ url, options, body: JSON.parse(options.body).payload, token: JSON.parse(options.body).session_token });
+      return { ok: true, id: 'saved-id', duplicate: false };
     }
     if (url.includes('/rest/v1/app_versions')) {
       return [{ id: 'v2', app_name: 'operarios', version_name: '1.1', version_code: 2, apk_url: 'https://example.com/app.apk', changelog: 'Actualizaciones' }];
@@ -92,6 +92,7 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   t.after(() => dom.window.close());
   const w = dom.window;
   w.Notification = MockNotification;
+  w.localStorage.setItem('splash-worker-session', 'token-operario');
 
   w.SplashAndroid = {
     shareToWhatsApp(photoData, text) {
@@ -173,14 +174,16 @@ test('Operarios: reporte de servicios con chips 1ro a 7mo, montos rápidos, mét
   await flush();
 
   // Verificar llamada a Supabase cash_movements con ambos operarios
-  assert.equal(supabaseCalls.length, 1, 'Debe haber guardado el movimiento en Supabase');
+  assert.equal(supabaseCalls.length, 1, 'Debe haber enviado el reporte a administración');
+  assert.equal(supabaseCalls[0].token, 'token-operario', 'El reporte viaja con la sesión del operario');
   const savedMovement = supabaseCalls[0].body;
-  assert.equal(savedMovement.operator, 'Yerson y Paul');
+  assert.equal(savedMovement.second_operator, 'Paul');
   assert.equal(savedMovement.amount, 150);
-  assert.equal(savedMovement.service_number, 'Cuarto servicio');
+  assert.equal(savedMovement.service, 'Cuarto servicio');
   assert.equal(savedMovement.payment_method, 'Yape');
   assert.equal(savedMovement.observation, 'se dio vuelto en yape');
-  assert.equal(savedMovement.type, 'ENTRADA');
+  assert.match(savedMovement.id, /^sr_\d{10,}_[a-z0-9]{1,8}$/);
+  assert.match($('sr-message').textContent, /enviado a administración/i, 'El operario ve la confirmación real');
 
   // Verificar almacenamiento local para administración
   const localStore = JSON.parse(w.localStorage.getItem('splash-cash-records') || '{}');
@@ -513,3 +516,79 @@ test('Tutor interactivo SPLASH: burbuja flotante, pasos con spotlight y menú r�
 });
 
 
+
+async function submitServiceFromWorkerPage(handler, t) {
+  const dom = page('operarios.html', handler);
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  w.confirm = () => true;
+  w.localStorage.setItem('splash-worker-session', 'token-operario');
+  vm.runInContext(fs.readFileSync('splash-api.js', 'utf8'), dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('operarios.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+  const $ = (id) => w.document.getElementById(id);
+  $('open-service-report').click();
+  await flush();
+  w.document.querySelector('[data-service="Primer servicio"]').click();
+  $('sr-amount-input').value = '80';
+  $('sr-save-only').click();
+  await flush();
+  return { w, $ };
+}
+
+test('Operarios: sin la migración del RPC el reporte usa el insert directo con fecha de Lima y solo columnas válidas', async (t) => {
+  const inserts = [];
+  const { $ } = await submitServiceFromWorkerPage(async (url, options) => {
+    if (url.includes('/rpc/splash_report_service')) return new Response(JSON.stringify({ code: 'PGRST202' }), { status: 404 });
+    if (url.includes('/rest/v1/cash_movements')) { inserts.push(JSON.parse(options.body)); return []; }
+    return { ok: true, name: 'Yerson' };
+  }, t);
+  assert.equal(inserts.length, 1);
+  assert.match(inserts[0].date, /^\d{2}\/\d{2}\/\d{4}$/, 'misma fecha DD/MM/AAAA que consulta administración');
+  assert.equal('timestamp' in inserts[0], false, 'timestamp no es columna de cash_movements y hacía fallar el insert');
+  assert.equal('second_operator' in inserts[0], false);
+  assert.match($('sr-message').textContent, /enviado a administración/i);
+});
+
+test('Operarios: sin conexión el reporte queda en cola y se reenvía una sola vez al volver la red', async (t) => {
+  let online = false;
+  const received = [];
+  const { w, $ } = await submitServiceFromWorkerPage(async (url, options) => {
+    if (url.includes('/rpc/splash_report_service')) {
+      if (!online) throw new TypeError('Failed to fetch');
+      received.push(JSON.parse(options.body).payload.id);
+      return { ok: true };
+    }
+    return { ok: true, name: 'Yerson' };
+  }, t);
+  assert.match($('sr-message').textContent, /Sin conexión/);
+  const queued = JSON.parse(w.localStorage.getItem('splash-pending-service-reports'));
+  assert.equal(queued.length, 1);
+
+  online = true;
+  w.dispatchEvent(new w.Event('online'));
+  await flush();
+  assert.deepEqual(received, [queued[0].id], 'se reenvía con el mismo id para no duplicar');
+  assert.deepEqual(JSON.parse(w.localStorage.getItem('splash-pending-service-reports')), []);
+});
+
+test('Administración: avisa de un servicio nuevo de operario sin tener caja abierta y no avisa de los ya existentes', async (t) => {
+  const rows = [{ id: 'sr_1_aaaa', operator: 'Antiguo', service_number: 'Primer servicio', amount: 50, payment_method: 'Efectivo' }];
+  const dom = page('admin.html', async (url) => (url.includes('/rest/v1/cash_movements') ? rows : []));
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  Object.defineProperty(w.document, 'hidden', { value: false, configurable: true });
+  w.sessionStorage.setItem('splash-admin-session', 'admin-token');
+  vm.runInContext(fs.readFileSync('app.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+  w.document.getElementById('login-screen').hidden = true;
+
+  await w.pollWorkerServiceReports();
+  assert.equal(w.document.getElementById('toast').classList.contains('visible'), false, 'el primer sondeo solo registra lo existente');
+  rows.push({ id: 'sr_2_bbbb', operator: 'Yerson Prueba', service_number: 'Segundo servicio', amount: 120, payment_method: 'Yape' });
+  await w.pollWorkerServiceReports();
+  const toast = w.document.getElementById('toast-text').textContent;
+  assert.match(toast, /Nuevo servicio de Yerson Prueba/);
+  assert.match(toast, /S\/ 120\.00/);
+  assert.doesNotMatch(toast, /Antiguo/);
+});

@@ -33,6 +33,24 @@ window.Splash = {
     }
     return data;
   },
+  async reportService(report) {
+    const token = localStorage.getItem('splash-worker-session') || '';
+    const response = await fetch(`${this.url}/rest/v1/rpc/splash_report_service`, {
+      method: 'POST',
+      headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_token: token, payload: report })
+    });
+    const data = await response.json().catch(() => null);
+    if (response.ok && data && !data.error) return data;
+    const error = new Error(data?.error || (data?.code === 'PGRST202' ? 'Falta activar la migración de reportes.' : 'No se pudo enviar el reporte.'));
+    error.code = data?.code;
+    error.status = response.status;
+    if (error.code === 'SESSION' && token === (localStorage.getItem('splash-worker-session') || '')) {
+      localStorage.removeItem('splash-worker-session');
+      window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: 'worker' }));
+    }
+    throw error;
+  },
   async available() {
     try { return !!(await this.call('status')).ready; }
     catch (error) { if (error.code === 'PGRST202') return false; throw error; }

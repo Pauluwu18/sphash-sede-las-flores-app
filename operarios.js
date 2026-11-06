@@ -177,6 +177,7 @@
       showServiceReport();
     }
 
+    flushPendingReports();
     // Verificar si hay actualización disponible de forma no bloqueante
     checkAppVersionQuietly();
   }
@@ -399,20 +400,75 @@
     return n % 1 === 0 ? String(n) : n.toFixed(2);
   }
 
+  // Misma fecha (DD/MM/AAAA) y zona horaria que usa el panel de administración para consultar caja.
   function getTodayString() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }).format(new Date());
   }
 
   function getTimeString() {
-    const now = new Date();
-    const h = String(now.getHours()).padStart(2, '0');
-    const m = String(now.getMinutes()).padStart(2, '0');
-    return `${h}:${m}`;
+    return new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date());
   }
+
+  const PENDING_REPORTS_KEY = 'splash-pending-service-reports';
+  let flushingReports = false;
+
+  function readPendingReports() {
+    try { const list = JSON.parse(localStorage.getItem(PENDING_REPORTS_KEY) || '[]'); return Array.isArray(list) ? list : []; }
+    catch { return []; }
+  }
+
+  function writePendingReports(list) {
+    try { localStorage.setItem(PENDING_REPORTS_KEY, JSON.stringify(list)); } catch { /* sin almacenamiento: el reporte ya se mostró al operario */ }
+  }
+
+  async function legacyInsertReport(report) {
+    const response = await fetch(`${Splash.url}/rest/v1/cash_movements`, {
+      method: 'POST',
+      headers: { apikey: Splash.key, Authorization: `Bearer ${Splash.key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal,resolution=ignore-duplicates' },
+      body: JSON.stringify(report)
+    });
+    if (!response.ok) { const error = new Error('No se pudo enviar el reporte.'); error.status = response.status; throw error; }
+  }
+
+  // Devuelve 'sent' | 'queued' | 'rejected'. Solo los fallos de red o del servidor se reintentan.
+  async function deliverServiceReport(report) {
+    try {
+      try {
+        await Splash.reportService({ id: report.id, amount: report.amount, service: report.service_number, payment_method: report.payment_method, second_operator: report.second_operator, observation: report.observation, photo: report.photo });
+      } catch (error) {
+        if (error.code !== 'PGRST202') throw error;
+        const { second_operator, ...row } = report;
+        await legacyInsertReport(row);
+      }
+      return 'sent';
+    } catch (error) {
+      const retryable = !error.status || error.status >= 500 || error.status === 408 || error.status === 429;
+      if (error.code === 'SESSION' || !retryable) return 'rejected';
+      const pending = readPendingReports();
+      if (!pending.some(item => item.id === report.id)) writePendingReports([...pending, report]);
+      return 'queued';
+    }
+  }
+
+  async function flushPendingReports() {
+    if (flushingReports || !localStorage.getItem('splash-worker-session')) return;
+    flushingReports = true;
+    try {
+      for (const report of readPendingReports()) {
+        const outcome = await deliverServiceReport(report);
+        if (outcome === 'queued') break;
+        writePendingReports(readPendingReports().filter(item => item.id !== report.id));
+      }
+    } finally { flushingReports = false; }
+    if ($('sr-pending-note')) {
+      const left = readPendingReports().length;
+      $('sr-pending-note').hidden = !left;
+      $('sr-pending-note').textContent = left ? `${left} reporte${left === 1 ? '' : 's'} pendiente${left === 1 ? '' : 's'} de envío a administración.` : '';
+    }
+  }
+  window.addEventListener('online', flushPendingReports);
+  const pendingReportsInterval = setInterval(flushPendingReports, 30000);
+  window.addEventListener('pagehide', () => clearInterval(pendingReportsInterval));
 
   function buildSrWhatsappText() {
     const service = ($('sr-service-input')?.value || '').trim() || 'Primer servicio';
@@ -770,7 +826,7 @@
       } catch (_) {}
     }
 
-    const movement = {
+    const report = {
       id: 'sr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       date,
       type: 'ENTRADA',
@@ -782,22 +838,12 @@
       concept: `${service} - ${payMethod}${obsClean ? ' (' + obsClean + ')' : ''}`,
       photo: photoToSend,
       time,
-      timestamp: Date.now()
+      second_operator: secondOp
     };
+    const movement = { ...report, timestamp: Date.now() };
 
-    // 1. Guardar en Supabase en segundo plano (para no bloquear el gesto del usuario al compartir a WhatsApp)
-    fetch(`${Splash.url}/rest/v1/cash_movements`, {
-      method: 'POST',
-      headers: {
-        apikey: Splash.key,
-        Authorization: `Bearer ${Splash.key}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal'
-      },
-      body: JSON.stringify(movement)
-    }).catch(err => {
-      console.warn('No se pudo sincronizar directamente con Supabase (se mantiene local):', err);
-    });
+    // 1. Enviar a administración sin esperar, para no perder el gesto del usuario al compartir a WhatsApp.
+    const delivery = deliverServiceReport(report);
 
     // 2. Guardar en localStorage de caja (compatible con reportes de administración)
     try {
@@ -811,15 +857,22 @@
 
     const whatsappMessage = buildSrWhatsappText();
 
-    if ($('sr-message')) {
-      $('sr-message').textContent = 'Servicio registrado correctamente en caja.';
-      $('sr-message').classList.add('is-success');
-    }
-
     // 3. Compartir inmediatamente mientras el gesto de clic del usuario está 100% activo
     if (sendToWhatsapp) {
       await shareSrToWhatsApp(movement, whatsappMessage);
     }
+
+    const outcome = await delivery;
+    if ($('sr-message')) {
+      const messages = {
+        sent: 'Servicio enviado a administración y registrado en caja.',
+        queued: 'Sin conexión: el servicio quedó guardado y se enviará a administración automáticamente.',
+        rejected: 'Administración no recibió el servicio. Revisa tu sesión e inténtalo de nuevo.'
+      };
+      $('sr-message').textContent = messages[outcome];
+      $('sr-message').classList.toggle('is-success', outcome !== 'rejected');
+    }
+    flushPendingReports();
 
     // Resetear formulario para el siguiente servicio
     if ($('sr-amount-input')) $('sr-amount-input').value = '';

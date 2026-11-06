@@ -2045,6 +2045,34 @@ if (cashCalendar) {
   });
 }
 
+// Avisa al administrador de los servicios reportados por operarios (ids "sr_"), aunque no tenga caja abierta.
+let knownWorkerReportIds = null;
+let workerReportPollDate = "";
+async function pollWorkerServiceReports() {
+  if (!loginScreen.hidden || document.hidden) return;
+  const today = new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Lima" }).format(new Date());
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cash_movements?date=eq.${encodeURIComponent(today)}&id=like.sr_*&select=id,operator,service_number,amount,payment_method&order=created_at.asc`, { headers: supabaseHeaders() });
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return;
+    const seen = workerReportPollDate === today ? knownWorkerReportIds : null;
+    workerReportPollDate = today;
+    knownWorkerReportIds = new Set(rows.map((row) => row.id));
+    if (!seen) return;
+    const fresh = rows.filter((row) => !seen.has(row.id));
+    if (!fresh.length) return;
+    fresh.forEach((row) => {
+      const message = `Nuevo servicio de ${row.operator || "un operario"}: ${row.service_number || "servicio"} · ${formatMontoDisplay(row.amount)} (${row.payment_method || "Efectivo"})`;
+      showToast(message);
+      notifyAttendance(message);
+    });
+    await fetchCashMovementsFromSupabase(today);
+    if (cashReportsDialog && cashReportsDialog.open && (activeCashDate || today) === today) renderCashDialog();
+  } catch (_) {}
+}
+setInterval(pollWorkerServiceReports, 10000);
+
 // =============================================================
 // GESTOR DE VERSIONES DE APK (SUPABASE)
 // =============================================================
