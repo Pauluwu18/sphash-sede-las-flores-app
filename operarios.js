@@ -949,7 +949,7 @@
     if (window.SplashAndroid) {
       if (typeof window.SplashAndroid.getAppVersion === 'function') {
         try {
-          const v = Number(window.SplashAndroid.getAppVersion());
+          const v = Number(String(window.SplashAndroid.getAppVersion()).split(':').pop());
           if (!isNaN(v) && v > 0) return v;
         } catch (_) {}
       }
@@ -963,8 +963,9 @@
   function getCurrentVersionDisplay() {
     if (window.SplashAndroid) {
       if (typeof window.SplashAndroid.getAppVersion === 'function') {
-        const v = window.SplashAndroid.getAppVersion();
-        return `v1.1 (código ${v})`;
+        const raw = String(window.SplashAndroid.getAppVersion());
+        const [name, code] = raw.includes(':') ? raw.split(':') : ['1.1', raw];
+        return `v${name} (código ${code})`;
       }
       return 'v1.0 (antigua - actualización requerida)';
     }
@@ -1011,6 +1012,47 @@
     }
   }
 
+  let updateAvailable = false;
+
+  function canAutoInstall() {
+    try { return !!window.SplashAndroid?.canAutoInstall?.() && typeof window.SplashAndroid.downloadAndInstallApk === 'function'; }
+    catch { return false; }
+  }
+
+  // La APK nativa informa el avance real de la descarga y abre sola el instalador al terminar.
+  window.splashApkProgress = (state, done, total) => {
+    const bar = $('updater-progress-bar');
+    const percent = $('updater-progress-percent');
+    const label = $('updater-progress-label');
+    const detail = $('updater-progress-detail');
+    const dlBtn = $('updater-download-btn');
+    const installBtn = $('updater-install-btn');
+    const installHint = $('updater-install-hint');
+    const megabytes = bytes => (bytes / 1048576).toFixed(1);
+    const pct = total > 0 ? Math.min(100, Math.floor(done * 100 / total)) : 0;
+    if ($('updater-progress-wrap')) $('updater-progress-wrap').hidden = false;
+    if (state === 'downloading') {
+      if (label) label.textContent = 'Descargando actualización…';
+      if (bar) bar.style.width = `${pct}%`;
+      if (percent) percent.textContent = total > 0 ? `${pct}%` : '…';
+      if (detail) detail.textContent = total > 0 ? `${megabytes(done)} MB de ${megabytes(total)} MB` : `${megabytes(done)} MB`;
+    } else if (state === 'done') {
+      if (label) label.textContent = '✅ Descarga completa. Abriendo instalador…';
+      if (bar) { bar.style.width = '100%'; bar.style.background = '#27ae60'; }
+      if (percent) percent.textContent = '100%';
+      if (installBtn) {
+        installBtn.hidden = false;
+        installBtn.textContent = 'Instalar ahora';
+        installBtn.onclick = () => window.SplashAndroid?.installDownloadedApk?.();
+      }
+      if (installHint) installHint.hidden = false;
+    } else {
+      if (label) label.textContent = '❌ No se pudo descargar. Revisa tu conexión e inténtalo otra vez.';
+      if (bar) bar.style.background = '#c0392b';
+      if (dlBtn) dlBtn.hidden = false;
+    }
+  };
+
   function runDownloadProgress(targetUrl, onComplete) {
     const wrap = $('updater-progress-wrap');
     const bar = $('updater-progress-bar');
@@ -1025,6 +1067,16 @@
     if (wrap) wrap.hidden = false;
     if (installBtn) installBtn.hidden = true;
     if (installHint) installHint.hidden = true;
+
+    if (canAutoInstall()) {
+      if (bar) { bar.style.width = '0%'; bar.style.background = ''; }
+      if (percent) percent.textContent = '0%';
+      if (label) label.textContent = 'Descargando actualización…';
+      if (detail) detail.textContent = 'Iniciando…';
+      try { window.SplashAndroid.downloadAndInstallApk(targetUrl || cachedLatestApkUrl || DEFAULT_APK_URL); }
+      catch { window.splashApkProgress('error', 0, 0); }
+      return;
+    }
 
     // Disparar descarga en segundo plano
     triggerDownloadApk(targetUrl, false);
@@ -1068,6 +1120,7 @@
       if (latest.apk_url) cachedLatestApkUrl = latest.apk_url;
 
       if (latest.version_code > currentCode) {
+        updateAvailable = true;
         if ($('updater-menu-subtitle')) {
           $('updater-menu-subtitle').textContent = `Versión v${latest.version_name} en vivo`;
         }
@@ -1081,7 +1134,7 @@
     } catch (_) {}
   }
 
-  async function openAppUpdater() {
+  async function openAppUpdater(options = {}) {
     const dialog = $('app-updater-dialog');
     if (!dialog) return;
     dialog.showModal();
@@ -1126,6 +1179,7 @@
         if (downloadBtn) {
           downloadBtn.onclick = () => runDownloadProgress(latest.apk_url);
         }
+        if (options.autoStart === true && canAutoInstall()) runDownloadProgress(latest.apk_url);
       } else {
         if ($('updater-up-to-date-wrap')) $('updater-up-to-date-wrap').hidden = false;
       }
@@ -1139,9 +1193,9 @@
     }
   }
 
-  if ($('open-updater')) $('open-updater').addEventListener('click', openAppUpdater);
-  if ($('header-update-btn')) $('header-update-btn').addEventListener('click', openAppUpdater);
-  if ($('worker-update-banner-btn')) $('worker-update-banner-btn').addEventListener('click', openAppUpdater);
+  if ($('open-updater')) $('open-updater').addEventListener('click', () => openAppUpdater({ autoStart: updateAvailable }));
+  if ($('header-update-btn')) $('header-update-btn').addEventListener('click', () => openAppUpdater({ autoStart: updateAvailable }));
+  if ($('worker-update-banner-btn')) $('worker-update-banner-btn').addEventListener('click', () => openAppUpdater({ autoStart: true }));
   if ($('login-download-apk-btn')) $('login-download-apk-btn').addEventListener('click', () => runDownloadProgress(DEFAULT_APK_URL));
   if ($('updater-redownload-btn')) $('updater-redownload-btn').addEventListener('click', () => runDownloadProgress(cachedLatestApkUrl || DEFAULT_APK_URL));
   if ($('updater-dialog-close')) $('updater-dialog-close').addEventListener('click', () => $('app-updater-dialog')?.close());

@@ -16,6 +16,7 @@ import android.os.Looper
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Base64
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -289,29 +290,24 @@ class MainActivity : Activity() {
             }
         }
 
+        @JavascriptInterface fun canAutoInstall(): Boolean = true
+
         @JavascriptInterface fun downloadAndInstallApk(apkUrl: String) {
             mainHandler.post {
                 if (!isSitePage(Uri.parse(webView.url ?: ""))) return@post
-                try {
-                    if (apkUrl.isBlank()) return@post
-                    toast("Iniciando descarga de actualización...")
-                    val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
-                        setTitle("Actualización SPLASH")
-                        setDescription("Descargando nueva versión...")
-                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "SPLASH-Operarios-Update.apk")
-                        setMimeType("application/vnd.android.package-archive")
-                    }
-                    val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                    dm.enqueue(request)
-                    toast("Descarga iniciada. Revisa tus notificaciones para instalar.")
-                } catch (e: Exception) {
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
-                    } catch (_: Exception) {
-                        toast("No se pudo descargar la actualización.")
-                    }
+                val uri = Uri.parse(apkUrl.trim())
+                if (uri.scheme != "https" || uri.host.isNullOrBlank()) {
+                    toast("Enlace de actualización no válido.")
+                    reportApkProgress("error", 0, 0)
+                    return@post
                 }
+                startApkDownload(uri)
+            }
+        }
+
+        @JavascriptInterface fun installDownloadedApk() {
+            mainHandler.post {
+                if (isSitePage(Uri.parse(webView.url ?: ""))) installApkFile()
             }
         }
 
@@ -349,6 +345,111 @@ class MainActivity : Activity() {
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
+    private val apkFileName = "SPLASH-Operarios-Update.apk"
+    private var apkDownloadId = -1L
+    private var apkProgressRunnable: Runnable? = null
+    private var awaitingInstallPermission = false
+
+    private fun apkFile(): File? =
+        getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.let { File(it, apkFileName) }
+
+    private fun reportApkProgress(state: String, done: Long, total: Long) {
+        if (!::webView.isInitialized) return
+        webView.evaluateJavascript("window.splashApkProgress&&window.splashApkProgress('$state',$done,$total)", null)
+    }
+
+    private fun startApkDownload(uri: Uri) {
+        val target = apkFile()
+        if (target == null) {
+            toast("No se pudo preparar la descarga.")
+            reportApkProgress("error", 0, 0)
+            return
+        }
+        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        if (apkDownloadId != -1L) dm.remove(apkDownloadId)
+        if (target.exists()) target.delete()
+        try {
+            val request = DownloadManager.Request(uri).apply {
+                setTitle("Actualización SPLASH")
+                setDescription("Descargando nueva versión...")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                setDestinationInExternalFilesDir(this@MainActivity, Environment.DIRECTORY_DOWNLOADS, apkFileName)
+                setMimeType("application/vnd.android.package-archive")
+            }
+            apkDownloadId = dm.enqueue(request)
+        } catch (_: Exception) {
+            toast("No se pudo iniciar la descarga.")
+            reportApkProgress("error", 0, 0)
+            return
+        }
+        pollApkProgress(dm, apkDownloadId)
+    }
+
+    private fun pollApkProgress(dm: DownloadManager, id: Long) {
+        apkProgressRunnable?.let { mainHandler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                if (id != apkDownloadId) return
+                var state = "downloading"
+                var done = 0L
+                var total = 0L
+                val cursor = dm.query(DownloadManager.Query().setFilterById(id))
+                try {
+                    if (cursor == null || !cursor.moveToFirst()) {
+                        state = "error"
+                    } else {
+                        done = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                        total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                        when (cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
+                            DownloadManager.STATUS_SUCCESSFUL -> state = "done"
+                            DownloadManager.STATUS_FAILED -> state = "error"
+                        }
+                    }
+                } finally {
+                    cursor?.close()
+                }
+                reportApkProgress(state, done, total)
+                when (state) {
+                    "done" -> { apkDownloadId = -1L; installApkFile() }
+                    "error" -> { apkDownloadId = -1L; toast("No se pudo descargar la actualización.") }
+                    else -> mainHandler.postDelayed(this, 400)
+                }
+            }
+        }
+        apkProgressRunnable = runnable
+        mainHandler.post(runnable)
+    }
+
+    private fun installApkFile() {
+        val file = apkFile()
+        if (file == null || !file.exists() || file.length() < 100_000) {
+            toast("La actualización descargada no es válida. Vuelve a intentarlo.")
+            reportApkProgress("error", 0, 0)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            awaitingInstallPermission = true
+            toast("Activa «Permitir de esta fuente» y vuelve a la app para instalar.")
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            } catch (_: Exception) {
+                awaitingInstallPermission = false
+                toast("Abre Ajustes y permite instalar apps desde SPLASH.")
+            }
+            return
+        }
+        try {
+            val contentUri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            toast("No se pudo abrir el instalador.")
+        }
+    }
+
     @Deprecated("Uses WebView navigation history")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
@@ -366,6 +467,11 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::webView.isInitialized) webView.onResume()
+        if (awaitingInstallPermission) {
+            awaitingInstallPermission = false
+            if (Build.VERSION.SDK_INT < 26 || packageManager.canRequestPackageInstalls()) installApkFile()
+            else toast("Sin ese permiso no se puede instalar. Pulsa «Instalar ahora» para reintentar.")
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -374,6 +480,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        apkProgressRunnable?.let { mainHandler.removeCallbacks(it) }
         denyCameraRequest()
         fileCallback?.onReceiveValue(null)
         fileCallback = null

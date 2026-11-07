@@ -592,3 +592,68 @@ test('Administración: avisa de un servicio nuevo de operario sin tener caja abi
   assert.match(toast, /S\/ 120\.00/);
   assert.doesNotMatch(toast, /Antiguo/);
 });
+
+async function updaterPage(t, { appVersion, versionCode, autoInstall = true }) {
+  const calls = { download: [], install: 0 };
+  const dom = page('operarios.html', async (url) => {
+    if (url.includes('/rest/v1/app_versions')) {
+      return [{ id: 'v', app_name: 'operarios', version_name: '1.3', version_code: versionCode, apk_url: 'https://example.com/SPLASH-1.3.apk', changelog: 'Mejoras' }];
+    }
+    return [];
+  });
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  w.SplashAndroid = {
+    getAppVersion: () => appVersion,
+    downloadAndInstallApk: (url) => calls.download.push(url),
+    installDownloadedApk: () => { calls.install += 1; },
+    ...(autoInstall ? { canAutoInstall: () => true } : {})
+  };
+  w.localStorage.setItem('splash-worker-session', 'token-operario');
+  vm.runInContext(fs.readFileSync('splash-api.js', 'utf8'), dom.getInternalVMContext());
+  vm.runInContext(fs.readFileSync('operarios.js', 'utf8'), dom.getInternalVMContext());
+  await flush();
+  return { w, calls, $: (id) => w.document.getElementById(id) };
+}
+
+test('Actualizador: la versión "nombre:código" de la APK se interpreta bien y al estar al día no ofrece actualizar', async (t) => {
+  const { $ } = await updaterPage(t, { appVersion: '1.2:3', versionCode: 3 });
+  $('open-updater').click();
+  await flush();
+  assert.match($('updater-cur-ver').textContent, /v1\.2 \(código 3\)/);
+  assert.equal($('updater-available-wrap').hidden, true, 'ya tiene la última versión');
+  assert.equal($('updater-up-to-date-wrap').hidden, false);
+});
+
+test('Actualizador: con APK nueva el banner descarga en un toque, muestra el progreso real y ofrece instalar', async (t) => {
+  const { w, calls, $ } = await updaterPage(t, { appVersion: '1.2:3', versionCode: 4 });
+  assert.equal($('worker-update-banner').hidden, false, 'el banner avisa de la nueva versión');
+  $('worker-update-banner-btn').click();
+  await flush();
+  assert.deepEqual(calls.download, ['https://example.com/SPLASH-1.3.apk'], 'un solo toque inicia la descarga nativa');
+  assert.equal($('updater-download-btn').hidden, true);
+
+  w.splashApkProgress('downloading', 1048576, 2097152);
+  assert.equal($('updater-progress-percent').textContent, '50%');
+  assert.equal($('updater-progress-detail').textContent, '1.0 MB de 2.0 MB');
+  assert.equal($('updater-progress-bar').style.width, '50%');
+
+  w.splashApkProgress('done', 2097152, 2097152);
+  assert.match($('updater-progress-label').textContent, /Abriendo instalador/);
+  assert.equal($('updater-install-btn').hidden, false);
+  $('updater-install-btn').click();
+  assert.equal(calls.install, 1, '«Instalar ahora» reintenta abrir el instalador sin volver a descargar');
+  assert.equal(calls.download.length, 1);
+});
+
+test('Actualizador: si falla la descarga nativa permite reintentar', async (t) => {
+  const { w, calls, $ } = await updaterPage(t, { appVersion: '1.2:3', versionCode: 4 });
+  $('open-updater').click();
+  await flush();
+  assert.equal(calls.download.length, 1, 'con actualización disponible el menú inicia la descarga solo');
+  w.splashApkProgress('error', 0, 0);
+  assert.match($('updater-progress-label').textContent, /No se pudo descargar/);
+  assert.equal($('updater-download-btn').hidden, false);
+  $('updater-download-btn').click();
+  assert.equal(calls.download.length, 2);
+});
