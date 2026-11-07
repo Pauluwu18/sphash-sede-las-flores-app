@@ -516,3 +516,34 @@ body:has(#worker-login:not([hidden])) .splash-tutor-fab {
   }
 }
 
+
+/* 7. ANCLAJE EN PANTALLAS CHICAS Y PANTALLA FINAL */
+.splash-tutor-stage.is-compact {
+  left: 10px !important;
+  width: min(calc(100vw - 20px), 520px) !important;
+  max-width: none !important;
+}
+
+.splash-tutor-stage.is-docked-top {
+  top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+  bottom: auto !important;
+}
+
+.splash-tutor-stage.is-docked-bottom {
+  top: auto !important;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.splash-tutor-stage.is-finale,
+.splash-tutor-stage.is-compact.is-finale {
+  top: 50% !important;
+  bottom: auto !important;
+  left: 50% !important;
+  width: min(calc(100vw - 20px), 420px) !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* Mientras corre el tutorial, la burbuja ❓ no debe tapar los botones del diálogo. */
+.splash-tutor-running .splash-tutor-fab {
+  display: none !important;
+}

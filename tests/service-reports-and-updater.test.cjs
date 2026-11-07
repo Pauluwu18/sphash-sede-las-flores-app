@@ -465,6 +465,7 @@ test('Tutor interactivo SPLASH: burbuja flotante, pasos con spotlight y menú r�
   vm.runInContext(fs.readFileSync('splash-api.js', 'utf8'), dom.getInternalVMContext());
   vm.runInContext(fs.readFileSync('operarios.js', 'utf8'), dom.getInternalVMContext());
   vm.runInContext(fs.readFileSync('splash-tutor.js', 'utf8'), dom.getInternalVMContext());
+  w.document.getElementById('worker-home').hidden = false; // sesión iniciada
   await flush();
 
   // 1. Verificar existencia de la burbuja fija ❓
