@@ -138,3 +138,16 @@ test('Tutor: Escape cierra el tutor', async (t) => {
   w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
   assert.equal(tutor.isActive, false);
 });
+
+test('Tutor: el fondo oscuro lo hace el resaltado (el recuadro señalado no se atenúa) y en la pantalla final vuelve el fondo', async (t) => {
+  const { w, tutor } = await tutorPage(t);
+  const css = fs.readFileSync('splash-tutor.css', 'utf8');
+  assert.match(css, /\.splash-tutor-running:not\(\.splash-tutor-finale\) \.splash-tutor-overlay\s*\{\s*background:\s*transparent/);
+  const body = w.document.body.classList;
+  tutor.startTutorial(['step-amount']);
+  assert.equal(body.contains('splash-tutor-running') && !body.contains('splash-tutor-finale'), true);
+  tutor.nextStep();
+  assert.equal(body.contains('splash-tutor-finale'), true, 'sin resaltado, el fondo vuelve a oscurecer');
+  tutor.closeTutor();
+  assert.equal(body.contains('splash-tutor-running') || body.contains('splash-tutor-finale'), false);
+});

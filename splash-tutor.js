@@ -389,6 +389,7 @@
       this.isActive = true;
       this.finished = false;
       document.body.classList.add('splash-tutor-running');
+      document.body.classList.remove('splash-tutor-finale');
       if (this.fab) this.fab.style.display = 'none';
       this.overlay.classList.add('is-active');
       this.spotlight.classList.add('is-active');
@@ -529,6 +530,7 @@
       this.finished = true;
       this.activeElement = null;
       this.spotlight.classList.remove('is-active');
+      document.body.classList.add('splash-tutor-finale');
       const full = this.flowName === 'full';
       $('splash-tutor-step-pill').textContent = '¡Completado!';
       $('splash-tutor-title').textContent = full ? '¡Perfecto! 🎉' : '¡Listo! 🎉';
@@ -553,7 +555,7 @@
       this.finished = false;
       this.activeElement = null;
       this.dock = null;
-      document.body.classList.remove('splash-tutor-running');
+      document.body.classList.remove('splash-tutor-running', 'splash-tutor-finale');
       this.overlay.classList.remove('is-active');
       this.spotlight.classList.remove('is-active');
       this.stage.style.display = 'none';

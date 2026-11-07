@@ -547,3 +547,8 @@ body:has(#worker-login:not([hidden])) .splash-tutor-fab {
 .splash-tutor-running .splash-tutor-fab {
   display: none !important;
 }
+
+/* Con el resaltado activo, el oscurecido lo hace su sombra: así el recuadro señalado queda con su brillo normal. */
+.splash-tutor-running:not(.splash-tutor-finale) .splash-tutor-overlay {
+  background: transparent;
+}
