@@ -652,9 +652,31 @@ test('Actualizador: si falla la descarga nativa permite reintentar', async (t) =
   $('open-updater').click();
   await flush();
   assert.equal(calls.download.length, 1, 'con actualización disponible el menú inicia la descarga solo');
-  w.splashApkProgress('error', 0, 0);
+  w.splashApkProgress('error', 0, 0); // enlace publicado falla: prueba el alternativo
+  w.splashApkProgress('error', 0, 0); // el alternativo también falla
   assert.match($('updater-progress-label').textContent, /No se pudo descargar/);
   assert.equal($('updater-download-btn').hidden, false);
   $('updater-download-btn').click();
-  assert.equal(calls.download.length, 2);
+  assert.equal(calls.download.length, 3);
+});
+
+test('Actualizador: si el enlace publicado da error prueba una vez el enlace del repositorio y no entra en bucle', async (t) => {
+  const fallback = 'https://raw.githubusercontent.com/Pauluwu18/sphash-sede-las-flores-app/main/SPLASH-Operarios.apk';
+  const { w, calls, $ } = await updaterPage(t, { appVersion: '1.2:3', versionCode: 4 });
+  $('worker-update-banner-btn').click();
+  await flush();
+  assert.deepEqual(calls.download, ['https://example.com/SPLASH-1.3.apk']);
+
+  w.splashApkProgress('error', 0, 0);
+  assert.deepEqual(calls.download, ['https://example.com/SPLASH-1.3.apk', fallback], 'reintenta con el enlace del repositorio');
+  assert.match($('updater-progress-detail').textContent, /alternativo/);
+
+  w.splashApkProgress('error', 0, 0);
+  assert.equal(calls.download.length, 2, 'no vuelve a intentar en bucle');
+  assert.match($('updater-progress-label').textContent, /No se pudo descargar/);
+  assert.equal($('updater-download-btn').hidden, false);
+
+  $('updater-download-btn').click();
+  assert.equal(calls.download.length, 3, 'un reintento manual vuelve a probar primero el enlace publicado');
+  assert.equal(calls.download[2], 'https://example.com/SPLASH-1.3.apk');
 });

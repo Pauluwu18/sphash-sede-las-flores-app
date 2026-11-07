@@ -1013,6 +1013,8 @@
   }
 
   let updateAvailable = false;
+  let lastApkUrl = '';
+  let apkFallbackTried = false;
 
   function canAutoInstall() {
     try { return !!window.SplashAndroid?.canAutoInstall?.() && typeof window.SplashAndroid.downloadAndInstallApk === 'function'; }
@@ -1046,6 +1048,10 @@
         installBtn.onclick = () => window.SplashAndroid?.installDownloadedApk?.();
       }
       if (installHint) installHint.hidden = false;
+    } else if (lastApkUrl && lastApkUrl !== DEFAULT_APK_URL && !apkFallbackTried) {
+      // El enlace publicado puede estar roto (404); se prueba una vez con el enlace del repositorio.
+      apkFallbackTried = true;
+      runDownloadProgress(DEFAULT_APK_URL, undefined, true);
     } else {
       if (label) label.textContent = '❌ No se pudo descargar. Revisa tu conexión e inténtalo otra vez.';
       if (bar) bar.style.background = '#c0392b';
@@ -1053,7 +1059,7 @@
     }
   };
 
-  function runDownloadProgress(targetUrl, onComplete) {
+  function runDownloadProgress(targetUrl, onComplete, isFallback = false) {
     const wrap = $('updater-progress-wrap');
     const bar = $('updater-progress-bar');
     const percent = $('updater-progress-percent');
@@ -1072,8 +1078,10 @@
       if (bar) { bar.style.width = '0%'; bar.style.background = ''; }
       if (percent) percent.textContent = '0%';
       if (label) label.textContent = 'Descargando actualización…';
-      if (detail) detail.textContent = 'Iniciando…';
-      try { window.SplashAndroid.downloadAndInstallApk(targetUrl || cachedLatestApkUrl || DEFAULT_APK_URL); }
+      if (detail) detail.textContent = isFallback ? 'El enlace falló, probando el enlace alternativo…' : 'Iniciando…';
+      lastApkUrl = targetUrl || cachedLatestApkUrl || DEFAULT_APK_URL;
+      if (!isFallback) apkFallbackTried = false;
+      try { window.SplashAndroid.downloadAndInstallApk(lastApkUrl); }
       catch { window.splashApkProgress('error', 0, 0); }
       return;
     }
