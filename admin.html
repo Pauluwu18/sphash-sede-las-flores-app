@@ -112,6 +112,9 @@
       <button class="navigation-action" id="cash-reports-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
         <span><strong>Reportes de caja</strong><small>Tomar foto de billete y reportar</small></span>
       </button>
+      <button class="navigation-action" id="pay-week-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V10m6 10V4m6 20v-7m4 7H2"/></svg></span>
+        <span><strong>Pagos por servicio</strong><small>Semana, ganancias y pago de cada operario</small></span>
+      </button>
       <button class="navigation-action" id="apk-manager-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
         <span><strong>Versiones y APK</strong><small>Publicar actualizaciones en Supabase</small></span>
       </button>
@@ -562,6 +565,24 @@
     </form>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-text"></span><span class="toast-progress"></span></div>
+  <dialog class="profile-dialog" id="pay-week-dialog" aria-labelledby="pay-week-title" style="width:min(720px,calc(100% - 24px))">
+    <div class="dialog-heading"><h2 id="pay-week-title">Pagos por servicio</h2><button class="dialog-close" id="pay-week-close" type="button" aria-label="Cerrar">&times;</button></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 14px">
+      <button class="secondary-action" id="pay-week-prev" type="button" aria-label="Semana anterior">‹</button>
+      <strong id="pay-week-label" aria-live="polite">—</strong>
+      <button class="secondary-action" id="pay-week-next" type="button" aria-label="Semana siguiente">›</button>
+    </div>
+    <h3 style="margin:6px 0;font-size:1rem">Ganancia de la semana por operario</h3>
+    <div id="pay-week-chart"></div>
+    <h3 style="margin:18px 0 6px;font-size:1rem">Detalle y pago por servicio</h3>
+    <p class="worker-help">Edita el pago por servicio y pulsa Enter o sal del campo para guardarlo. El cambio se aplica a todas las semanas.</p>
+    <div style="overflow-x:auto"><table id="pay-week-table" style="width:100%;border-collapse:collapse;font-size:.9rem;min-width:430px">
+      <thead><tr style="text-align:left;color:#627d8d"><th style="padding:6px 4px">Operario</th><th style="padding:6px 4px;text-align:right">Servicios</th><th style="padding:6px 4px;text-align:right">Pago (S/)</th><th style="padding:6px 4px;text-align:right">Total</th></tr></thead>
+      <tbody></tbody><tfoot></tfoot>
+    </table></div>
+    <p class="worker-help">Cuentan los servicios que cada operario reporta desde la app (sin importar el método de pago).</p>
+    <p id="pay-week-message" role="status" aria-live="polite"></p>
+  </dialog>
   <dialog class="profile-dialog" id="profile-dialog" aria-labelledby="profile-title">
     <div class="dialog-heading"><h2 id="profile-title">Perfil del operario</h2><button class="dialog-close" id="profile-close" type="button" aria-label="Cerrar perfil">&times;</button></div>
     <form id="profile-form"><input id="profile-id" type="hidden">
@@ -635,11 +656,13 @@
     </div>
     <div id="apk-versions-list" style="margin-top:12px;display:grid;gap:10px;max-height:260px;overflow-y:auto"></div>
   </dialog>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=20261004-admin"></script>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=20261109-pagos"></script>
+  <script src="splash-charts.js?v=1.0"></script>
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/exceljs.min.js"></script>
   <script src="attendance-excel.js?v=20261003"></script>
   <script src="app.js?v=1.2-caja-efectivo"></script>
   <script src="admin-qr.js?v=20261004-profile"></script>
+  <script src="pagos-admin.js?v=1.0"></script>
 </body>
 </html>

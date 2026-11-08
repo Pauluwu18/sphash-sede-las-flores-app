@@ -85,6 +85,14 @@
         <span>Consulta tus fechas y horas de llegada registradas.</span>
       </button>
 
+      <button class="worker-menu-card" id="open-week" type="button">
+        <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/>
+        </svg>
+        <strong>Mi semana</strong>
+        <span>Cuántos servicios hiciste y cuánto llevas ganado, con gráficas.</span>
+      </button>
+
       <button class="worker-menu-card" id="open-updater" type="button">
         <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -289,6 +297,26 @@
     </section>
 
     <!-- PANEL DE HISTORIAL -->
+    <section class="worker-panel" id="week-panel" hidden aria-labelledby="week-title">
+      <p class="section-kicker">Tu resumen</p><h2 id="week-title">Mi semana</h2>
+      <div class="week-nav" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0">
+        <button class="secondary-action" id="week-prev" type="button" aria-label="Semana anterior">‹</button>
+        <strong id="week-label" aria-live="polite">—</strong>
+        <button class="secondary-action" id="week-next" type="button" aria-label="Semana siguiente">›</button>
+      </div>
+      <div class="history-summary-cards">
+        <div><strong id="week-services">—</strong><span>Servicios</span></div>
+        <div><strong id="week-rate">—</strong><span>Pago por servicio</span></div>
+        <div><strong id="week-total">—</strong><span>Llevas ganado</span></div>
+      </div>
+      <h3 style="margin:22px 0 6px;font-size:1rem">Servicios por día</h3>
+      <div id="week-chart-days"></div>
+      <table id="week-table" style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:8px"><tbody></tbody></table>
+      <h3 style="margin:22px 0 6px;font-size:1rem">Lo ganado en las últimas 6 semanas</h3>
+      <div id="week-chart-history"></div>
+      <p class="worker-help">Solo cuentan los servicios que reportaste desde la app. Si falta alguno, repórtalo con "Reportar servicio".</p>
+      <p id="week-message" role="status" aria-live="polite"></p>
+    </section>
     <section class="worker-panel" id="history-panel" hidden aria-labelledby="worker-history-title">
       <p class="section-kicker">Tu historial personal</p><h2 id="worker-history-title">Mis asistencias</h2>
       <p>Consulta cuándo llegaste y a qué hora. Las más recientes aparecen primero.</p>
@@ -366,9 +394,11 @@
   </dialog>
 
   <script src="vendor/supabase.js"></script>
-  <script src="splash-api.js?v=1.4-blocked-admin"></script>
+  <script src="splash-api.js?v=1.5-pagos"></script>
   <script src="vendor/jsQR.js"></script>
   <script src="operarios.js?v=1.6-link"></script>
+  <script src="splash-charts.js?v=1.0"></script>
+  <script src="semana-operario.js?v=1.0"></script>
   <script src="splash-tutor.js?v=1.7-tutor"></script>
 </body>
 </html>

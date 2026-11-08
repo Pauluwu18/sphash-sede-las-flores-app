@@ -96,6 +96,12 @@
       text: 'Aquí ves todas tus llegadas con la hora y si fueron temprano o tardanza. Puedes filtrar por mes.',
       view: showHome
     },
+    'step-week': {
+      selector: '#open-week',
+      title: 'Mi semana',
+      text: 'Aquí ves cuántos servicios hiciste cada día, cuánto te pagan por servicio y cuánto llevas ganado, con gráficas. Puedes revisar semanas anteriores con las flechas.',
+      view: showHome
+    },
     'step-update': {
       selector: '#open-updater',
       title: 'Actualizar la app',
@@ -110,6 +116,7 @@
     photo: ['step-photo'],
     observation: ['step-observation'],
     attendance: ['step-checkin', 'step-history'],
+    week: ['step-week'],
     update: ['step-update']
   };
 
@@ -244,6 +251,10 @@
           <button type="button" class="splash-tutor-menu-item" data-tutor-flow="attendance">
             <span class="splash-tutor-menu-item-icon">🕘</span>
             <span>Registrar y ver mi asistencia</span>
+          </button>
+          <button type="button" class="splash-tutor-menu-item" data-tutor-flow="week">
+            <span class="splash-tutor-menu-item-icon">📊</span>
+            <span>Ver mi semana y mi pago</span>
           </button>
           <button type="button" class="splash-tutor-menu-item" data-tutor-flow="update">
             <span class="splash-tutor-menu-item-icon">🔄</span>

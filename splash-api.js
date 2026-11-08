@@ -51,6 +51,31 @@ window.Splash = {
     }
     throw error;
   },
+  async rpc(name, body, role = 'admin') {
+    const response = await fetch(`${this.url}/rest/v1/rpc/${name}`, {
+      method: 'POST',
+      headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json().catch(() => null);
+    if (response.ok && data && !data.error) return data;
+    const error = new Error(data?.error || (data?.code === 'PGRST202' ? 'Falta activar la migración de pagos por servicio en Supabase.' : 'No se pudo completar la operación.'));
+    error.code = data?.code;
+    if (error.code === 'SESSION') {
+      if (role === 'worker') { localStorage.removeItem('splash-worker-session'); window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: 'worker' })); }
+      else { this.clearAdminSession(); window.dispatchEvent(new CustomEvent('splash-session-expired', { detail: 'admin' })); }
+    }
+    throw error;
+  },
+  workerWeek(weekStart = null) {
+    return this.rpc('splash_worker_week', { session_token: localStorage.getItem('splash-worker-session') || '', week_start: weekStart }, 'worker');
+  },
+  adminWeek(weekStart = null) {
+    return this.rpc('splash_admin_week', { session_token: this.adminSession(), week_start: weekStart }, 'admin');
+  },
+  setServiceRate(personId, rate) {
+    return this.rpc('splash_set_service_rate', { session_token: this.adminSession(), person_id: personId, rate }, 'admin');
+  },
   async available() {
     try { return !!(await this.call('status')).ready; }
     catch (error) { if (error.code === 'PGRST202') return false; throw error; }
