@@ -63,7 +63,7 @@
     'step-payment-method': {
       selector: '#sr-payment-methods',
       title: 'Método de pago (obligatorio)',
-      text: 'Elige cómo pagó el cliente. Efectivo solo si recibiste el dinero en la mano: es lo único que entra a la caja. Yape, Plin y Tarjeta van a la cuenta de la empresa. Si no eliges uno, el reporte no se envía.',
+      text: 'Elige cómo pagó el cliente. Efectivo solo si recibiste el dinero en la mano: es lo único que entra a la caja. Yape, Plin, Tarjeta y Link (pago por enlace) van a la cuenta de la empresa. Si no eliges uno, el reporte no se envía.',
       view: showServicePanel
     },
     'step-photo': {

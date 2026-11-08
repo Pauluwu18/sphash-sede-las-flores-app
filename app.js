@@ -1424,7 +1424,7 @@ function buildCashReportText(date, movements) {
   const body = movements.map(formatCashMovement).join('\n\n');
 
   const sum = summarizeCash(movements);
-  const digitalLine = sum.digital > 0 ? `\n*DIGITAL (Yape/Plin/Tarjeta, no entra a caja):* S/ ${sum.digital.toFixed(2)}` : '';
+  const digitalLine = sum.digital > 0 ? `\n*DIGITAL (Yape/Plin/Tarjeta/Link, no entra a caja):* S/ ${sum.digital.toFixed(2)}` : '';
   const footer = `----------------------------------------\n*TOTAL ENTRADAS (efectivo):* S/ ${sum.entradas.toFixed(2)}\n*TOTAL SALIDAS:*  S/ ${sum.salidas.toFixed(2)}\n*SALDO EN CAJA:*  S/ ${sum.saldo.toFixed(2)}${digitalLine}`;
   return `${header}\n\n${body}\n\n${footer}`;
 }

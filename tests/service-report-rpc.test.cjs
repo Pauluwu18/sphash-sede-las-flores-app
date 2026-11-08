@@ -15,6 +15,7 @@ test('splash_report_service valida la sesión del operario, toma su nombre de la
   const migration=fs.readFileSync('migrations/20261106_worker_service_report.sql','utf8');
   await db.exec(migration);await db.exec(migration);
 
+  await db.exec(fs.readFileSync('migrations/20261108_payment_method_link.sql','utf8'));
   const api=async(action,payload={},token='')=>(await db.query('select public.splash_api($1,$2::jsonb,$3) result',[action,JSON.stringify(payload),token])).rows[0].result;
   const report=async(token,payload)=>(await db.query('select public.splash_report_service($1,$2::jsonb) result',[token,JSON.stringify(payload)])).rows[0].result;
   const password=(await db.query('select password from splash_initial_access')).rows[0].password;
@@ -24,6 +25,8 @@ test('splash_report_service valida la sesión del operario, toma su nombre de la
   const worker=await api('activate',{dni:'00112233',pin:'1234',qr});
   const valid={id:'sr_1762400000000_ab12',amount:150,service:'Cuarto servicio',payment_method:'Yape',observation:'vuelto en yape',second_operator:'Paul',operator:'Suplantado'};
 
+  assert.equal((await report(worker.token,{...valid,id:'sr_1762400000001_link',payment_method:'Link'})).ok,true,'Link es un método válido');
+  await db.exec("delete from public.cash_movements where id='sr_1762400000001_link'");
   assert.equal((await report('',valid)).code,'SESSION','sin sesión se rechaza');
   assert.equal((await report(admin.token,valid)).code,'SESSION','una sesión admin no sirve para reportar como operario');
 

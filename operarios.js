@@ -815,7 +815,7 @@ METODO: ${payMethod || 'ELIGE EL MÉTODO'}`;
 
     const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || '';
     if (!payMethod) {
-      alert('Elige cómo se pagó el servicio: Yape, Plin, Tarjeta o Efectivo. Efectivo solo si recibiste el dinero en la mano.');
+      alert('Elige cómo se pagó el servicio: Yape, Plin, Tarjeta, Link o Efectivo. Efectivo solo si recibiste el dinero en la mano.');
       $('sr-payment-methods')?.scrollIntoView?.({ block: 'center' });
       return;
     }

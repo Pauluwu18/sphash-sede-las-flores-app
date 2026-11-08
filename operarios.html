@@ -176,7 +176,7 @@
         <!-- METODO DE PAGO -->
         <div class="sr-field-group">
           <label class="worker-label">Método de pago <span style="color:#c0392b">(obligatorio)</span></label>
-          <p class="sr-hint" style="margin:0 0 8px;font-size:0.82rem;color:#456">Elige <strong>Efectivo</strong> solo si el dinero lo recibiste en la mano. Yape, Plin y Tarjeta no entran a la caja.</p>
+          <p class="sr-hint" style="margin:0 0 8px;font-size:0.82rem;color:#456">Elige <strong>Efectivo</strong> solo si el dinero lo recibiste en la mano. Yape, Plin, Tarjeta y Link no entran a la caja.</p>
           <div class="sr-payment-methods" id="sr-payment-methods">
             <label class="sr-payment-option" data-pay="Yape">
               <input type="radio" name="sr-payment" value="Yape" class="visually-hidden">
@@ -192,6 +192,11 @@
               <input type="radio" name="sr-payment" value="Tarjeta" class="visually-hidden">
               <span class="sr-pay-icon" style="background:#2f80ed">💳</span>
               <span>Tarjeta</span>
+            </label>
+            <label class="sr-payment-option" data-pay="Link">
+              <input type="radio" name="sr-payment" value="Link" class="visually-hidden">
+              <span class="sr-pay-icon" style="background:#8e44ad">🔗</span>
+              <span>Link</span>
             </label>
             <label class="sr-payment-option" data-pay="Efectivo">
               <input type="radio" name="sr-payment" value="Efectivo" class="visually-hidden">
@@ -363,7 +368,7 @@
   <script src="vendor/supabase.js"></script>
   <script src="splash-api.js?v=1.4-blocked-admin"></script>
   <script src="vendor/jsQR.js"></script>
-  <script src="operarios.js?v=1.5-extra-pago"></script>
+  <script src="operarios.js?v=1.6-link"></script>
   <script src="splash-tutor.js?v=1.7-tutor"></script>
 </body>
 </html>
