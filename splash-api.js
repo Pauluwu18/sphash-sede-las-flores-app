@@ -76,6 +76,18 @@ window.Splash = {
   setServiceRate(personId, rate) {
     return this.rpc('splash_set_service_rate', { session_token: this.adminSession(), person_id: personId, rate }, 'admin');
   },
+  agendaUpload(payload) {
+    return this.rpc('splash_agenda_upload', { session_token: this.adminSession(), payload }, 'admin');
+  },
+  agendaPending(day = null) {
+    return this.rpc('splash_agenda_pending', { session_token: this.adminSession(), day }, 'admin');
+  },
+  agendaLink(agendaLabel, targetPerson) {
+    return this.rpc('splash_agenda_link', { session_token: this.adminSession(), agenda_label: agendaLabel, target_person: targetPerson }, 'admin');
+  },
+  workerPending() {
+    return this.rpc('splash_worker_pending', { session_token: localStorage.getItem('splash-worker-session') || '' }, 'worker');
+  },
   async available() {
     try { return !!(await this.call('status')).ready; }
     catch (error) { if (error.code === 'PGRST202') return false; throw error; }

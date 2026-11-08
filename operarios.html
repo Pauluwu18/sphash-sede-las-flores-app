@@ -53,6 +53,11 @@
         <button class="secondary-action" id="worker-logout">Cerrar sesión</button>
       </div>
     </header>
+    <div id="pending-banner" role="alert" hidden style="margin:0 0 16px;padding:14px 16px;border-radius:14px;background:#fdecea;border:1px solid #f0b3ab;color:#7d1f14">
+      <strong id="pending-banner-title">⚠ Tienes servicios pendientes por reportar</strong>
+      <p id="pending-banner-text" style="margin:6px 0 10px;font-size:.9rem"></p>
+      <button type="button" class="primary-button" id="pending-banner-action" style="background:#c0392b;border-color:#a32619;color:#fff">Reportar ahora</button>
+    </div>
     <p id="worker-menu-hint" class="worker-help">Elige una opción para continuar.</p>
     <a id="worker-back" class="secondary-action" href="operarios.html" hidden>← Volver al menú</a>
     
@@ -394,11 +399,13 @@
   </dialog>
 
   <script src="vendor/supabase.js"></script>
-  <script src="splash-api.js?v=1.5-pagos"></script>
+  <script src="splash-api.js?v=1.6-agenda"></script>
   <script src="vendor/jsQR.js"></script>
+  <script src="instalar-app.js?v=1.0"></script>
   <script src="operarios.js?v=1.6-link"></script>
   <script src="splash-charts.js?v=1.0"></script>
   <script src="semana-operario.js?v=1.0"></script>
+  <script src="pendientes-operario.js?v=1.0"></script>
   <script src="splash-tutor.js?v=1.7-tutor"></script>
 </body>
 </html>

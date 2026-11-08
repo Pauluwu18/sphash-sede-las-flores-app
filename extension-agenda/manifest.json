@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "SPLASH Agenda → Administración",
+  "version": "1.0.0",
+  "description": "Cuando exportas el Excel de la agenda en splashapp.net.pe, lo envía a la base de administración para controlar los servicios pendientes por reportar.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://splashapp.net.pe/*",
+    "https://*.splashapp.net.pe/*",
+    "https://yyhvpbgvmnhonyqzevfr.supabase.co/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "SPLASH Agenda" },
+  "content_scripts": [
+    {
+      "matches": ["https://splashapp.net.pe/*", "https://*.splashapp.net.pe/*"],
+      "js": ["content-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://splashapp.net.pe/*", "https://*.splashapp.net.pe/*"],
+      "js": ["exceljs.min.js", "agenda-parser.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

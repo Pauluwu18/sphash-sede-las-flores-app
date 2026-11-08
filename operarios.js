@@ -899,6 +899,7 @@ METODO: ${payMethod || 'ELIGE EL MÉTODO'}`;
       $('sr-message').classList.toggle('is-success', outcome !== 'rejected');
     }
     flushPendingReports();
+    if (outcome === 'sent') window.dispatchEvent(new CustomEvent('splash-reported'));
 
     // Resetear formulario para el siguiente servicio
     if ($('sr-amount-input')) $('sr-amount-input').value = '';

@@ -112,6 +112,9 @@
       <button class="navigation-action" id="cash-reports-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
         <span><strong>Reportes de caja</strong><small>Tomar foto de billete y reportar</small></span>
       </button>
+      <button class="navigation-action" id="agenda-pending-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span>
+        <span><strong>Servicios pendientes <b id="agenda-pending-badge" hidden style="background:#c0392b;color:#fff;border-radius:999px;padding:1px 8px;font-size:.75rem;margin-left:4px"></b></strong><small>Agenda vs. servicios reportados por operario</small></span>
+      </button>
       <button class="navigation-action" id="pay-week-button" type="button"><span class="navigation-action-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V10m6 10V4m6 20v-7m4 7H2"/></svg></span>
         <span><strong>Pagos por servicio</strong><small>Semana, ganancias y pago de cada operario</small></span>
       </button>
@@ -565,6 +568,26 @@
     </form>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-text"></span><span class="toast-progress"></span></div>
+  <dialog class="profile-dialog" id="agenda-pending-dialog" aria-labelledby="agenda-pending-title" style="width:min(760px,calc(100% - 24px))">
+    <div class="dialog-heading"><h2 id="agenda-pending-title">Servicios pendientes por reportar</h2><button class="dialog-close" id="agenda-pending-close" type="button" aria-label="Cerrar">&times;</button></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 6px">
+      <button class="secondary-action" id="agenda-prev" type="button" aria-label="Día anterior">‹</button>
+      <input id="agenda-date" type="date" aria-label="Día de la agenda" style="max-width:190px">
+      <button class="secondary-action" id="agenda-next" type="button" aria-label="Día siguiente">›</button>
+    </div>
+    <p id="agenda-summary" class="worker-help" role="status" aria-live="polite"></p>
+    <div style="overflow-x:auto"><table id="agenda-table" style="width:100%;border-collapse:collapse;font-size:.9rem;min-width:420px">
+      <thead><tr style="text-align:left;color:#627d8d"><th style="padding:6px 4px">Operario</th><th style="padding:6px 4px;text-align:right">Agenda</th><th style="padding:6px 4px;text-align:right">Reportados</th><th style="padding:6px 4px;text-align:right">Pendientes</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <label class="secondary-action" for="agenda-file" style="cursor:pointer;margin:0">📁 Subir Excel de la agenda</label>
+      <input type="file" id="agenda-file" accept=".xlsx" class="visually-hidden">
+      <button class="secondary-action" id="agenda-refresh" type="button">↻ Actualizar</button>
+    </div>
+    <p class="worker-help">La extensión de Chrome sube la agenda sola al exportar el Excel; este botón sirve como respaldo. Un servicio queda pendiente cuando la agenda asigna al operario más servicios de los que reportó ese día (en la app o anotados por ti en caja).</p>
+    <p id="agenda-message" role="status" aria-live="polite"></p>
+  </dialog>
   <dialog class="profile-dialog" id="pay-week-dialog" aria-labelledby="pay-week-title" style="width:min(720px,calc(100% - 24px))">
     <div class="dialog-heading"><h2 id="pay-week-title">Pagos por servicio</h2><button class="dialog-close" id="pay-week-close" type="button" aria-label="Cerrar">&times;</button></div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 14px">
@@ -656,7 +679,7 @@
     </div>
     <div id="apk-versions-list" style="margin-top:12px;display:grid;gap:10px;max-height:260px;overflow-y:auto"></div>
   </dialog>
-  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=20261109-pagos"></script>
+  <script src="vendor/supabase.js"></script><script src="splash-api.js?v=20261110-agenda"></script>
   <script src="splash-charts.js?v=1.0"></script>
   <script src="vendor/qrcode.min.js"></script>
   <script src="vendor/exceljs.min.js"></script>
@@ -664,5 +687,7 @@
   <script src="app.js?v=1.2-caja-efectivo"></script>
   <script src="admin-qr.js?v=20261004-profile"></script>
   <script src="pagos-admin.js?v=1.0"></script>
+  <script src="agenda-parser.js?v=1.0"></script>
+  <script src="agenda-admin.js?v=1.0"></script>
 </body>
 </html>

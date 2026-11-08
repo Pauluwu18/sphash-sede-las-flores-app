@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPLASH Agenda</title>
+<style>
+  :root { --ink:#102f49; --muted:#627d8d; --brand:#008c95; --line:#cfe0e4; --bg:#fff; --ok:#15803d; --bad:#b91c1c; }
+  @media (prefers-color-scheme: dark) { :root { --ink:#e6f1f4; --muted:#9db4be; --brand:#2cc0c9; --line:#2b4452; --bg:#13232d; --ok:#4ade80; --bad:#f87171; } }
+  body { margin:0; width:320px; padding:16px; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui, sans-serif; }
+  h1 { margin:0 0 4px; font-size:16px; }
+  p { margin:6px 0; color:var(--muted); font-size:13px; }
+  label { display:block; margin:10px 0 4px; font-weight:600; font-size:13px; }
+  input[type=text], input[type=password] { box-sizing:border-box; width:100%; height:38px; padding:0 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--ink); }
+  button, .file-btn { display:block; width:100%; margin-top:12px; padding:10px; border:0; border-radius:8px; background:var(--brand); color:#fff; font:600 14px system-ui; cursor:pointer; text-align:center; box-sizing:border-box; }
+  button.secondary, .file-btn { background:transparent; color:var(--brand); border:1px solid var(--brand); }
+  .status { margin-top:10px; padding:8px 10px; border-radius:8px; background:rgba(0,140,149,.1); font-size:13px; }
+  #message { min-height:18px; font-weight:600; }
+  #message.ok { color:var(--ok); } #message.bad { color:var(--bad); }
+  [hidden] { display:none !important; }
+  input[type=file] { display:none; }
+</style>
+</head>
+<body>
+  <h1>SPLASH Agenda → Administración</h1>
+  <p>Al exportar el Excel en la agenda, se envía solo a administración.</p>
+
+  <form id="login-form" hidden>
+    <label for="user">Usuario administrador</label>
+    <input id="user" type="text" autocomplete="username" required>
+    <label for="pass">Contraseña</label>
+    <input id="pass" type="password" autocomplete="current-password" required>
+    <button type="submit">Iniciar sesión</button>
+  </form>
+
+  <section id="session" hidden>
+    <div class="status" id="status"></div>
+    <label class="file-btn" for="file" style="margin-top:12px">📁 Subir un Excel de la agenda</label>
+    <input id="file" type="file" accept=".xlsx">
+    <button type="button" id="logout" class="secondary">Cerrar sesión</button>
+  </section>
+
+  <p id="message" role="status" aria-live="polite"></p>
+  <script src="exceljs.min.js"></script>
+  <script src="agenda-parser.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
