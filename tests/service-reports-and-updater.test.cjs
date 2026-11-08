@@ -491,7 +491,7 @@ test('Tutor interactivo SPLASH: burbuja flotante, pasos con spotlight y menú r�
   assert.equal($('service-report-panel').hidden, false, 'El panel de reporte debe mostrarse en el paso 2');
 
   // 4. Avanzar por todos los pasos hasta el último (paso 8)
-  for (let i = 2; i < 8; i++) {
+  for (let i = 2; i < 9; i++) {
     w.splashTutor.nextStep();
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -532,6 +532,9 @@ async function submitServiceFromWorkerPage(handler, t) {
   await flush();
   w.document.querySelector('[data-service="Primer servicio"]').click();
   $('sr-amount-input').value = '80';
+  const yape = w.document.querySelector('input[name="sr-payment"][value="Yape"]');
+  yape.checked = true;
+  yape.dispatchEvent(new w.Event('change'));
   $('sr-save-only').click();
   await flush();
   return { w, $ };

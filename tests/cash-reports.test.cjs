@@ -120,7 +120,7 @@ test('Reportes de caja: apertura de modal, registro de entradas y salidas con fo
   assert.match(reportText, /SALIDA S\/30 3\. RAUL\s*\nservicio 1/);
   assert.match(reportText, /SALIDA S\/50\s*\nSueldo 3\. RAUL/);
   assert.match(reportText, /SALIDA S\/20\s*\ncompra de insumos/);
-  assert.match(reportText, /\*TOTAL ENTRADAS:\* S\/ 120\.00/);
+  assert.match(reportText, /\*TOTAL ENTRADAS \(efectivo\):\* S\/ 120\.00/);
   assert.match(reportText, /\*TOTAL SALIDAS:\*  S\/ 100\.00/);
   assert.match(reportText, /\*SALDO EN CAJA:\*  S\/ 20\.00/);
 

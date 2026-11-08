@@ -54,10 +54,16 @@
       text: 'Aquí indica cuánto se cobró por el servicio. Puedes elegir montos rápidos como S/100, S/120 o S/150, o escribir el monto exacto.',
       view: showServicePanel
     },
+    'step-extra': {
+      selector: '#sr-extra-group',
+      title: 'Extra cobrado',
+      text: 'Si el cliente pagó un extra aparte del servicio, escríbelo aquí (por ejemplo 80). Se suma al total y el 50 % es tu comisión; no hace falta escribirlo en la observación.',
+      view: showServicePanel
+    },
     'step-payment-method': {
       selector: '#sr-payment-methods',
-      title: 'Método de pago',
-      text: 'Selecciona cómo se realizó el pago: Yape, Plin, Tarjeta o Efectivo.',
+      title: 'Método de pago (obligatorio)',
+      text: 'Elige cómo pagó el cliente. Efectivo solo si recibiste el dinero en la mano: es lo único que entra a la caja. Yape, Plin y Tarjeta van a la cuenta de la empresa. Si no eliges uno, el reporte no se envía.',
       view: showServicePanel
     },
     'step-photo': {
@@ -69,7 +75,7 @@
     'step-observation': {
       selector: '#sr-observation-input',
       title: 'Observación opcional',
-      text: 'Este campo es opcional. Puedes escribir información adicional sobre el servicio, por ejemplo: (se dio vuelto en yape).',
+      text: 'Este campo es opcional. Úsalo para aclaraciones, por ejemplo: se dio vuelto en yape. El extra y el método de pago ya tienen su propio campo.',
       view: showServicePanel
     },
     'step-submit': {
@@ -99,8 +105,8 @@
   };
 
   const FLOWS = {
-    full: ['step-open-report', 'step-operator', 'step-service-num', 'step-amount', 'step-payment-method', 'step-photo', 'step-observation', 'step-submit'],
-    payment: ['step-amount', 'step-payment-method'],
+    full: ['step-open-report', 'step-operator', 'step-service-num', 'step-amount', 'step-extra', 'step-payment-method', 'step-photo', 'step-observation', 'step-submit'],
+    payment: ['step-amount', 'step-extra', 'step-payment-method'],
     photo: ['step-photo'],
     observation: ['step-observation'],
     attendance: ['step-checkin', 'step-history'],
@@ -225,7 +231,7 @@
           </button>
           <button type="button" class="splash-tutor-menu-item" data-tutor-flow="payment">
             <span class="splash-tutor-menu-item-icon">💰</span>
-            <span>Registrar monto y pago</span>
+            <span>Registrar monto, extra y pago</span>
           </button>
           <button type="button" class="splash-tutor-menu-item" data-tutor-flow="photo">
             <span class="splash-tutor-menu-item-icon">📷</span>

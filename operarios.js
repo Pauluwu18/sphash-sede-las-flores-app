@@ -470,6 +470,12 @@
   const pendingReportsInterval = setInterval(flushPendingReports, 30000);
   window.addEventListener('pagehide', () => clearInterval(pendingReportsInterval));
 
+  // Extra cobrado aparte del servicio; el operario recibe el 50 % como comisión.
+  function getSrExtra() {
+    const value = Number($('sr-extra-input')?.value);
+    return Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : 0;
+  }
+
   function buildSrWhatsappText() {
     const service = ($('sr-service-input')?.value || '').trim() || 'Primer servicio';
     const primaryOp = ($('sr-operator-input')?.value || $('sr-operator-display')?.textContent || currentWorker?.name || '').trim();
@@ -480,13 +486,24 @@
 
     const amountVal = $('sr-amount-input')?.value;
     const amountFormatted = amountVal ? formatMontoExact(amountVal) : '0';
-    const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || 'Yape';
+    const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || '';
     const obsRaw = ($('sr-observation-input')?.value || '').trim();
     const obsClean = obsRaw ? obsRaw.replace(/^\(+|\)+$/g, '').trim() : '';
+    const extra = getSrExtra();
 
-    let text = `${service}\n${opLabel}: ${opDisplay}\nMONTO DEL SERVICIO: ${amountFormatted}\nMETODO: ${payMethod}`;
+    let text = `${service}
+${opLabel}: ${opDisplay}
+MONTO DEL SERVICIO: ${amountFormatted}`;
+    if (extra > 0) {
+      text += `
+EXTRA: ${formatMontoExact(extra)} (comisión operario: ${formatMontoExact(extra / 2)})
+TOTAL COBRADO: ${formatMontoExact((Number(amountVal) || 0) + extra)}`;
+    }
+    text += `
+METODO: ${payMethod || 'ELIGE EL MÉTODO'}`;
     if (obsClean) {
-      text += `\n(${obsClean})`;
+      text += `
+(${obsClean})`;
     }
     return text;
   }
@@ -497,7 +514,7 @@
   }
 
   // Listeners de actualización en tiempo real de la vista previa
-  ['sr-service-input', 'sr-amount-input', 'sr-observation-input', 'sr-operator-input', 'sr-second-operator-input'].forEach(id => {
+  ['sr-service-input', 'sr-amount-input', 'sr-extra-input', 'sr-observation-input', 'sr-operator-input', 'sr-second-operator-input'].forEach(id => {
     const el = $(id);
     if (el) {
       el.addEventListener('input', updateSrPreview);
@@ -796,9 +813,18 @@
     const secondOp = ($('sr-second-operator-input')?.value || '').trim();
     const operator = secondOp ? `${primaryOp} y ${secondOp}` : primaryOp;
 
-    const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || 'Yape';
+    const payMethod = document.querySelector('input[name="sr-payment"]:checked')?.value || '';
+    if (!payMethod) {
+      alert('Elige cómo se pagó el servicio: Yape, Plin, Tarjeta o Efectivo. Efectivo solo si recibiste el dinero en la mano.');
+      $('sr-payment-methods')?.scrollIntoView?.({ block: 'center' });
+      return;
+    }
+    const extra = getSrExtra();
+    const totalAmount = Math.round((amount + extra) * 100) / 100;
     const obsRaw = ($('sr-observation-input')?.value || '').trim();
-    const obsClean = obsRaw ? obsRaw.replace(/^\(+|\)+$/g, '').trim() : '';
+    const obsBase = obsRaw ? obsRaw.replace(/^\(+|\)+$/g, '').trim() : '';
+    const extraNote = extra > 0 ? `Incluye extra S/${formatMontoExact(extra)} (comisión S/${formatMontoExact(extra / 2)})` : '';
+    const obsClean = [obsBase, extraNote].filter(Boolean).join(' · ').slice(0, 200);
     const date = getTodayString();
     const time = getTimeString();
 
@@ -819,7 +845,7 @@
       try {
         photoToSend = await stampSrPhoto(
           photoToSend,
-          `ENTRADA: S/ ${formatMontoExact(amount)}`,
+          `ENTRADA: S/ ${formatMontoExact(totalAmount)}`,
           `${service} - ${payMethod}`,
           `Operario: ${operator} | ${date} ${time}${obsClean ? ' (' + obsClean + ')' : ''}`
         );
@@ -830,7 +856,7 @@
       id: 'sr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       date,
       type: 'ENTRADA',
-      amount,
+      amount: totalAmount,
       operator,
       service_number: service,
       payment_method: payMethod,
@@ -876,6 +902,9 @@
 
     // Resetear formulario para el siguiente servicio
     if ($('sr-amount-input')) $('sr-amount-input').value = '';
+    if ($('sr-extra-input')) $('sr-extra-input').value = '';
+    document.querySelectorAll('input[name="sr-payment"]').forEach(r => { r.checked = false; });
+    document.querySelectorAll('.sr-payment-option').forEach(o => o.classList.remove('is-active'));
     if ($('sr-observation-input')) $('sr-observation-input').value = '';
     if ($('sr-second-operator-input')) $('sr-second-operator-input').value = '';
     if ($('sr-second-op-wrap')) $('sr-second-op-wrap').hidden = true;

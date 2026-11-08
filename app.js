@@ -1351,6 +1351,26 @@ async function fetchCashMovementsFromSupabase(date) {
   }
 }
 
+// Solo el efectivo mueve la caja fÃ­sica: Yape, Plin y Tarjeta entran a la cuenta, no al cajÃ³n.
+function isDigitalPayment(m) {
+  return m && m.type === 'ENTRADA' && !!m.payment_method && m.payment_method !== 'Efectivo';
+}
+
+function summarizeCash(movements) {
+  const sum = { entradas: 0, salidas: 0, countEntradas: 0, countSalidas: 0, digital: 0, countDigital: 0 };
+  (movements || []).forEach((m) => {
+    const amount = Number(m.amount) || 0;
+    if (m.type === 'ENTRADA') {
+      if (isDigitalPayment(m)) { sum.digital += amount; sum.countDigital++; }
+      else { sum.entradas += amount; sum.countEntradas++; }
+    } else {
+      sum.salidas += amount; sum.countSalidas++;
+    }
+  });
+  sum.saldo = sum.entradas - sum.salidas;
+  return sum;
+}
+
 function formatMontoExact(num) {
   const n = Number(num) || 0;
   return n % 1 === 0 ? String(n) : n.toFixed(2);
@@ -1403,14 +1423,9 @@ function buildCashReportText(date, movements) {
   const header = `*REPORTE DE CAJA - ${date}*\n*SPLASH SEDE LAS FLORES*`;
   const body = movements.map(formatCashMovement).join('\n\n');
 
-  let totalEntradas = 0;
-  let totalSalidas = 0;
-  movements.forEach((m) => {
-    if (m.type === 'ENTRADA') totalEntradas += Number(m.amount) || 0;
-    else totalSalidas += Number(m.amount) || 0;
-  });
-  const saldo = totalEntradas - totalSalidas;
-  const footer = `----------------------------------------\n*TOTAL ENTRADAS:* S/ ${totalEntradas.toFixed(2)}\n*TOTAL SALIDAS:*  S/ ${totalSalidas.toFixed(2)}\n*SALDO EN CAJA:*  S/ ${saldo.toFixed(2)}`;
+  const sum = summarizeCash(movements);
+  const digitalLine = sum.digital > 0 ? `\n*DIGITAL (Yape/Plin/Tarjeta, no entra a caja):* S/ ${sum.digital.toFixed(2)}` : '';
+  const footer = `----------------------------------------\n*TOTAL ENTRADAS (efectivo):* S/ ${sum.entradas.toFixed(2)}\n*TOTAL SALIDAS:*  S/ ${sum.salidas.toFixed(2)}\n*SALDO EN CAJA:*  S/ ${sum.saldo.toFixed(2)}${digitalLine}`;
   return `${header}\n\n${body}\n\n${footer}`;
 }
 
@@ -1626,22 +1641,19 @@ function renderCashDialog() {
   }
 
   const movements = getMovementsForDate(date);
-  let totalEntradas = 0;
-  let totalSalidas = 0;
-  let countEntradas = 0;
-  let countSalidas = 0;
-
-  movements.forEach((m) => {
-    if (m.type === 'ENTRADA') {
-      totalEntradas += Number(m.amount) || 0;
-      countEntradas++;
-    } else {
-      totalSalidas += Number(m.amount) || 0;
-      countSalidas++;
-    }
-  });
-
-  const saldo = totalEntradas - totalSalidas;
+  const sum = summarizeCash(movements);
+  const totalEntradas = sum.entradas;
+  const totalSalidas = sum.salidas;
+  const countEntradas = sum.countEntradas;
+  const countSalidas = sum.countSalidas;
+  const saldo = sum.saldo;
+  const digitalNote = document.querySelector('#cash-digital-note');
+  if (digitalNote) {
+    digitalNote.hidden = !sum.countDigital;
+    digitalNote.textContent = sum.countDigital
+      ? `Digital (no entra a caja): ${formatMontoDisplay(sum.digital)} Â· ${sum.countDigital} pago${sum.countDigital === 1 ? '' : 's'}`
+      : '';
+  }
 
   if (cashTotalIncome) cashTotalIncome.textContent = formatMontoDisplay(totalEntradas);
   if (cashTotalExpense) cashTotalExpense.textContent = formatMontoDisplay(totalSalidas);

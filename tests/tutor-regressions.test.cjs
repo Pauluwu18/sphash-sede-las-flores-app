@@ -38,7 +38,7 @@ async function tutorPage(t, { loggedIn = true } = {}) {
 test('Tutor: tras terminarlo una vez, volver a abrirlo no se cierra solo en el primer "Siguiente"', async (t) => {
   const { tutor, $ } = await tutorPage(t);
   tutor.startTutorial('full');
-  for (let i = 0; i < 8; i++) tutor.nextStep();
+  for (let i = 0; i < 9; i++) tutor.nextStep();
   assert.match($('splash-tutor-title').textContent, /Perfecto/);
   $('splash-tutor-next-btn').click();
   assert.equal(tutor.isActive, false);
@@ -47,15 +47,17 @@ test('Tutor: tras terminarlo una vez, volver a abrirlo no se cierra solo en el p
   $('splash-tutor-next-btn').click();
   assert.equal(tutor.isActive, true, 'sigue abierto');
   assert.match($('splash-tutor-title').textContent, /Operario/);
-  assert.match($('splash-tutor-step-pill').textContent, /Paso 2 de 8/);
+  assert.match($('splash-tutor-step-pill').textContent, /Paso 2 de 9/);
 });
 
 test('Tutor: los temas del menú muestran solo sus pasos y no marcan el tutorial completo', async (t) => {
   const { w, tutor, $ } = await tutorPage(t);
   tutor.openMenu();
   w.document.querySelector('[data-tutor-flow="payment"]').click();
-  assert.match($('splash-tutor-step-pill').textContent, /Paso 1 de 2/);
+  assert.match($('splash-tutor-step-pill').textContent, /Paso 1 de 3/);
   assert.match($('splash-tutor-title').textContent, /Monto/);
+  $('splash-tutor-next-btn').click();
+  assert.match($('splash-tutor-title').textContent, /Extra/);
   $('splash-tutor-next-btn').click();
   assert.match($('splash-tutor-title').textContent, /Método de pago/);
   $('splash-tutor-next-btn').click();
@@ -73,7 +75,7 @@ test('Tutor: los temas del menú muestran solo sus pasos y no marcan el tutorial
 test('Tutor: "Anterior" salta hacia atrás los pasos ocultos y no se cuelga', async (t) => {
   const { tutor, $ } = await tutorPage(t);
   tutor.startTutorial('full');
-  tutor.goToStep(4, 1);
+  tutor.goToStep(5, 1);
   $('sr-photo-actions').hidden = true;
   tutor.nextStep();
   assert.match($('splash-tutor-title').textContent, /Observación/, 'salta la foto oculta hacia adelante');

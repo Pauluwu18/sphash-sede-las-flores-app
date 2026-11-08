@@ -162,12 +162,24 @@
           </div>
         </div>
 
+
+        <!-- EXTRA (COMISION 50%) -->
+        <div class="sr-field-group" id="sr-extra-group">
+          <label class="worker-label" for="sr-extra-input">Extra cobrado (S/) <small style="font-weight:500">opcional</small></label>
+          <div class="sr-input-with-prefix">
+            <span class="sr-prefix">S/</span>
+            <input type="number" step="any" min="0" id="sr-extra-input" class="worker-input" placeholder="0">
+          </div>
+          <p id="sr-extra-note" class="sr-hint" style="margin:6px 0 0;font-size:0.82rem;color:#456" hidden></p>
+        </div>
+
         <!-- METODO DE PAGO -->
         <div class="sr-field-group">
-          <label class="worker-label">Método de pago</label>
+          <label class="worker-label">Método de pago <span style="color:#c0392b">(obligatorio)</span></label>
+          <p class="sr-hint" style="margin:0 0 8px;font-size:0.82rem;color:#456">Elige <strong>Efectivo</strong> solo si el dinero lo recibiste en la mano. Yape, Plin y Tarjeta no entran a la caja.</p>
           <div class="sr-payment-methods" id="sr-payment-methods">
-            <label class="sr-payment-option is-active" data-pay="Yape">
-              <input type="radio" name="sr-payment" value="Yape" checked class="visually-hidden">
+            <label class="sr-payment-option" data-pay="Yape">
+              <input type="radio" name="sr-payment" value="Yape" class="visually-hidden">
               <img src="icon-yape.png" alt="Yape" class="sr-pay-img">
               <span>Yape</span>
             </label>
@@ -351,7 +363,7 @@
   <script src="vendor/supabase.js"></script>
   <script src="splash-api.js?v=1.4-blocked-admin"></script>
   <script src="vendor/jsQR.js"></script>
-  <script src="operarios.js?v=1.4-blocked-admin"></script>
-  <script src="splash-tutor.js?v=1.6-tutor"></script>
+  <script src="operarios.js?v=1.5-extra-pago"></script>
+  <script src="splash-tutor.js?v=1.7-tutor"></script>
 </body>
 </html>
