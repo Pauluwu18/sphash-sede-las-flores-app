@@ -188,12 +188,16 @@
       $('worker-submit').disabled = true;
       $('worker-login-message').textContent = '';
       try {
-        const dni = $('worker-dni').value.trim();
-        const pin = $('worker-pin').value;
-        if (activating && (pin !== $('worker-pin-confirm').value || !/^\d{4}$/.test(pin))) throw new Error('Escribe el mismo PIN de 4 dígitos en ambos campos.');
+        // Sin espacios, puntos ni guiones (p. ej. al pegar el DNI), para que nada bloquee el ingreso sin avisar.
+        const dni = $('worker-dni').value.normalize('NFKC').replace(/[\s.\-]/g, '');
+        const pin = $('worker-pin').value.normalize('NFKC').replace(/\s/g, '');
+        if (!/^\d{8}$/.test(dni)) throw new Error('El DNI debe tener 8 números.');
+        if (activating && (pin !== $('worker-pin-confirm').value.replace(/\s/g, '') || !/^\d{4}$/.test(pin))) throw new Error('Escribe el mismo PIN de 4 números en ambos campos.');
+        if (pin && !/^\d{4}$/.test(pin)) throw new Error('El PIN son 4 números (no es una contraseña). Si es tu primera vez, deja el PIN vacío y toca «Iniciar sesión» para crearlo.');
         const result = await Splash.call(activating ? 'activate' : 'worker_login', { dni, pin, ...(qrToken && { qr: qrToken }) }, 'worker');
         if (result.needs_pin) {
           activating = true;
+          const typedPin = /^\d{4}$/.test(pin);
           $('pin-confirm-wrap').hidden = false;
           $('worker-pin').required = true;
           $('worker-pin-confirm').required = true;
@@ -201,7 +205,11 @@
           $('worker-dni').readOnly = true;
           $('worker-submit').textContent = 'Crear PIN e ingresar';
           $('worker-intro').textContent = 'Crea tu PIN personal de 4 dígitos. El administrador podrá consultarlo si lo olvidas.';
-          $('worker-pin').focus();
+          $('worker-login-message').textContent = typedPin
+            ? 'Es tu primer ingreso: repite tu PIN en el campo de abajo para crearlo.'
+            : 'Es tu primer ingreso: crea un PIN de 4 números y repítelo abajo.';
+          if (!typedPin) $('worker-pin').value = '';
+          $((typedPin ? 'worker-pin-confirm' : 'worker-pin')).focus();
           return;
         }
         localStorage.setItem('splash-worker-session', result.token);

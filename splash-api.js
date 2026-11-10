@@ -14,12 +14,19 @@ window.Splash = {
   },
   async call(action, payload = {}, role = 'admin') {
     const token = role === 'worker' ? localStorage.getItem('splash-worker-session') || '' : this.adminSession();
-    const response = await fetch(`${this.url}/rest/v1/rpc/splash_api`, {
-      method: 'POST',
-      headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, payload, token })
-    });
-    const data = await response.json();
+    let response, data;
+    try {
+      response = await fetch(`${this.url}/rest/v1/rpc/splash_api`, {
+        method: 'POST',
+        headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload, token })
+      });
+      data = await response.json();
+    } catch {
+      const error = new Error('No se pudo conectar con el servidor. Revisa tu internet e inténtalo de nuevo.');
+      error.code = 'NETWORK';
+      throw error;
+    }
     if (!response.ok || data?.error) {
       const error = new Error(data?.error || (data?.code === 'PGRST202' ? 'Falta activar la migración QR en Supabase.' : 'No se pudo completar la operación.'));
       error.code = data?.code;
