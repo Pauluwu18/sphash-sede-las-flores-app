@@ -28,8 +28,10 @@ window.Splash = {
       throw error;
     }
     if (!response.ok || data?.error) {
-      const error = new Error(data?.error || (data?.code === 'PGRST202' ? 'Falta activar la migración QR en Supabase.' : 'No se pudo completar la operación.'));
-      error.code = data?.code;
+      const serverDown = !data?.error && (response.status >= 500 || data?.code === 'PGRST002');
+      const error = new Error(data?.error || (serverDown ? 'El servidor no está disponible en este momento. Espera unos minutos e inténtalo de nuevo.' : data?.code === 'PGRST202' ? 'Falta activar la migración QR en Supabase.' : 'No se pudo completar la operación.'));
+      error.code = serverDown ? 'SERVER' : data?.code;
+      error.status = response.status;
       if (error.code === 'SESSION' && (role === 'worker' || token === this.adminSession())) {
         if (role === 'admin') this.clearAdminSession();
         sessionStorage.removeItem(`splash-${role}-session`);

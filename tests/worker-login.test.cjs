@@ -103,3 +103,12 @@ test('Login operario: los mensajes del servidor se muestran tal cual y sin inter
   assert.match($('worker-login-message').textContent, /No se pudo conectar con el servidor/);
   assert.equal($('worker-submit').disabled, false, 'el botón queda disponible para reintentar');
 });
+
+test('Login: si la base de datos no responde (503) explica que el servidor no está disponible y no cierra sesiones', async (t) => {
+  const { w, $, submit } = await loginPage(t, () => ({ code: 'PGRST002', message: 'Could not query the database for the schema cache. Retrying.' }));
+  w.localStorage.setItem('splash-worker-session', 'token-guardado');
+  w.fetch = async () => new Response(JSON.stringify({ code: 'PGRST002', message: 'x' }), { status: 503 });
+  await submit('12345678', '1234');
+  assert.match($('worker-login-message').textContent, /servidor no está disponible/);
+  assert.equal(w.localStorage.getItem('splash-worker-session'), 'token-guardado', 'una caída del servidor no borra la sesión guardada');
+});
