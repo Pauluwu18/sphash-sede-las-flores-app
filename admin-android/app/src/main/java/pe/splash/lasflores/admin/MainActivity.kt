@@ -55,6 +55,8 @@ class MainActivity : Activity() {
     private val excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     private var registering = false
     private var registrationNonce: String? = null
+    private var registrationFailures = 0
+    private var lastRegistrationAttempt = 0L
     private var notificationPermissionRequested = false
     private var soundSettingsExplained = false
     private val notificationPermissionCode = 10
@@ -216,6 +218,10 @@ class MainActivity : Activity() {
         uri.scheme == "https" && uri.host == Uri.parse(BuildConfig.SITE_ORIGIN).host &&
             (uri.path == sitePrefix.dropLast(1) || (uri.path ?: "").startsWith(sitePrefix))
 
+    // 10 s, 20 s, 40 s... hasta 5 min: un fallo persistente (servidor caído, sesión inválida) no debe disparar una petición cada ciclo.
+    private fun registrationBackoffMs(): Long =
+        if (registrationFailures == 0) 0L else minOf(300_000L, 10_000L shl minOf(registrationFailures - 1, 5))
+
     private fun checkAdminSession() {
         if (!resumed || registering || !isSitePage(Uri.parse(webView.url ?: ""))) return
         if (!getSharedPreferences("push", MODE_PRIVATE).getBoolean("notifications_enabled", true)) return
@@ -248,6 +254,12 @@ class MainActivity : Activity() {
                 pushStatus("Las notificaciones están desactivadas en los ajustes de Android.")
                 return@evaluateJavascript
             }
+            if (registeredSession != session) {
+                registrationFailures = 0
+                lastRegistrationAttempt = 0L
+            }
+            if (System.currentTimeMillis() - lastRegistrationAttempt < registrationBackoffMs()) return@evaluateJavascript
+            lastRegistrationAttempt = System.currentTimeMillis()
             registering = true
             registeredSession = session
             val attempt = UUID.randomUUID().toString()
@@ -257,6 +269,7 @@ class MainActivity : Activity() {
                 if (registering && registrationNonce == attempt) {
                     registering = false
                     registrationNonce = null
+                    registrationFailures++
                     pushStatus("No se pudo confirmar el registro de avisos. Reintentando…")
                 }
             }, 20_000)
@@ -264,6 +277,7 @@ class MainActivity : Activity() {
                 if (registrationNonce != attempt) return@addOnCompleteListener
                 if (!resumed || !task.isSuccessful || task.result.isNullOrBlank()) {
                     registering = false
+                    registrationFailures++
                     pushStatus("No se pudo conectar con Firebase. Comprueba tu conexión y Google Play Services.")
                     return@addOnCompleteListener
                 }
@@ -407,6 +421,7 @@ class MainActivity : Activity() {
                 registrationNonce = null
                 registering = false
                 registeredForPage = success
+                registrationFailures = if (success) 0 else registrationFailures + 1
                 if (success) {
                     lastRegistration = System.currentTimeMillis()
                     getSharedPreferences("push", MODE_PRIVATE).edit()
